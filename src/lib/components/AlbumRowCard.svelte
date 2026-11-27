@@ -125,9 +125,9 @@
       {#if album.year || yearNote}
         <span class="flex items-center gap-2 shrink-0">
           {#if album.year}
-            <span class="text-xs text-brand-text-secondary font-medium tabular-nums"
-              >{album.year}</span
-            >
+            <span class="text-xs text-brand-text-secondary font-medium tabular-nums">
+              {album.year}
+            </span>
           {/if}
           {@render yearNote?.()}
         </span>
@@ -137,15 +137,9 @@
       <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
         {album.artist || i18n.t("collection.variousArtists")}
       </p>
-      <span class="shrink-0" onclick={(e) => e.stopPropagation()}
-        ><SongRating
-          isAlbum
-          revealOnInteract
-          rating={currentRating}
-          onRate={handleRate}
-          size="sm"
-        /></span
-      >
+      <span class="shrink-0" onclick={(e) => e.stopPropagation()}>
+        <SongRating isAlbum revealOnInteract rating={currentRating} onRate={handleRate} size="sm" />
+      </span>
     </div>
   </div>
 

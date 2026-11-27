@@ -406,8 +406,9 @@
                   {#if item.year}
                     <span
                       class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
-                      >{item.year}</span
                     >
+                      {item.year}
+                    </span>
                   {/if}
                 </div>
                 <div class="flex items-center justify-between gap-2">

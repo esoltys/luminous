@@ -803,8 +803,10 @@
             <button
               type="button"
               class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
-              onclick={() => navigationStore.viewGenreTag(readAsGenre)}>{readAsGenre}</button
+              onclick={() => navigationStore.viewGenreTag(readAsGenre)}
             >
+              {readAsGenre}
+            </button>
           </div>
         {:else if includedAliases.length > 0}
           <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
@@ -819,8 +821,9 @@
                   "Manage alias {alias}",
                 )}
                 onclick={() => tagsStore.openAliasDialog(entry.alias)}
-                >{entry.alias} · {entry.song_count}</button
               >
+                {entry.alias} · {entry.song_count}
+              </button>
             {/each}
           </div>
         {/if}

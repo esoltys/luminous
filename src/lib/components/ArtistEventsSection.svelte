@@ -157,8 +157,9 @@
           <Ticket class="w-3.5 h-3.5 text-brand-accent shrink-0" />
           <span
             class="underline decoration-brand-text-secondary/40 group-hover/mb:decoration-brand-accent"
-            >{i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}</span
           >
+            {i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}
+          </span>
           <ExternalLink
             class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/mb:opacity-100 transition-opacity shrink-0"
           />
@@ -281,9 +282,9 @@
                           <MapPin class="w-3 h-3 text-brand-text-secondary shrink-0" />
                           <span class="truncate">
                             {#if event.venue_name}
-                              <span class="font-medium text-brand-text-secondary"
-                                >{event.venue_name}</span
-                              >
+                              <span class="font-medium text-brand-text-secondary">
+                                {event.venue_name}
+                              </span>
                             {/if}
                             {#if event.venue_name && (event.venue_city || event.venue_country)}
                               <span class="mx-1">•</span>

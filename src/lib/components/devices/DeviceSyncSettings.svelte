@@ -393,9 +393,9 @@
             <h2 class="text-base font-bold text-brand-text-primary">
               {i18n.t("devices.whatGoesOn", { device: name })}
             </h2>
-            <span class="text-xs text-brand-text-secondary"
-              >{i18n.t("devices.sizeAfterConverting")}</span
-            >
+            <span class="text-xs text-brand-text-secondary">
+              {i18n.t("devices.sizeAfterConverting")}
+            </span>
           </div>
           {#if listed.length === 0}
             <p class="text-sm text-brand-text-secondary">{i18n.t("devices.nothingSelected")}</p>
@@ -418,20 +418,22 @@
                     onchange={() => toggle(source)}
                   />
                   <span class="flex-1 min-w-0">
-                    <span class="block text-sm text-brand-text-primary truncate"
-                      >{title(source)}</span
-                    >
+                    <span class="block text-sm text-brand-text-primary truncate">
+                      {title(source)}
+                    </span>
                     {#if checked && size}
                       <span
                         class="block text-xs truncate {size.capBytes !== null
                           ? 'text-brand-accent-text'
-                          : 'text-brand-text-secondary'}">{detail(source, size)}</span
+                          : 'text-brand-text-secondary'}"
                       >
+                        {detail(source, size)}
+                      </span>
                     {/if}
                   </span>
-                  <span class="text-xs tabular-nums text-brand-text-secondary shrink-0"
-                    >{checked && size ? formatStorageSize(size.bytes) : ""}</span
-                  >
+                  <span class="text-xs tabular-nums text-brand-text-secondary shrink-0">
+                    {checked && size ? formatStorageSize(size.bytes) : ""}
+                  </span>
                 </label>
               {/each}
             </div>
@@ -478,29 +480,35 @@
                       <button
                         class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10"
                         onclick={() => add({ kind: "library" })}
-                        >{i18n.t("devices.wholeLibrary")}</button
                       >
+                        {i18n.t("devices.wholeLibrary")}
+                      </button>
                     {/if}
                     {#each virtualAutoPlaylists as ap (ap.autoType)}
                       <button
                         class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate font-medium text-brand-accent-text"
                         onclick={() =>
                           add({ kind: "autoPlaylist", autoType: ap.autoType, name: ap.name })}
-                        >{ap.name}</button
                       >
+                        {ap.name}
+                      </button>
                     {/each}
                     {#each playlistChoices as p (p.id)}
                       <button
                         class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate"
-                        onclick={() => add({ kind: "playlist", id: p.id })}>{p.name}</button
+                        onclick={() => add({ kind: "playlist", id: p.id })}
                       >
+                        {p.name}
+                      </button>
                     {/each}
                   {:else if picker === "artists"}
                     {#each artistChoices as a (a.name)}
                       <button
                         class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate"
-                        onclick={() => add({ kind: "artist", name: a.name })}>{a.name}</button
+                        onclick={() => add({ kind: "artist", name: a.name })}
                       >
+                        {a.name}
+                      </button>
                     {/each}
                   {:else if picker === "albums"}
                     {#each albumChoices as a (a.album)}
@@ -530,9 +538,9 @@
 
           {#if device.storages.length > 1}
             <div class="flex flex-col gap-1.5">
-              <label for="sync-storage" class="text-sm font-semibold text-brand-text-primary"
-                >{i18n.t("devices.syncToStorage")}</label
-              >
+              <label for="sync-storage" class="text-sm font-semibold text-brand-text-primary">
+                {i18n.t("devices.syncToStorage")}
+              </label>
               <Select
                 id="sync-storage"
                 value={target?.id ?? ""}
@@ -549,9 +557,9 @@
           {/if}
 
           <div class="flex flex-col gap-1.5">
-            <span class="text-sm font-semibold text-brand-text-primary" id="unselected-label"
-              >{i18n.t("devices.songsYouUnselect")}</span
-            >
+            <span class="text-sm font-semibold text-brand-text-primary" id="unselected-label">
+              {i18n.t("devices.songsYouUnselect")}
+            </span>
             <div
               class="grid grid-cols-2 rounded-lg bg-brand-main/60 border border-brand-border/40 p-0.5"
               role="radiogroup"
@@ -568,10 +576,9 @@
                   onclick={() => {
                     if (settings) settings.unselected = mode;
                   }}
-                  >{i18n.t(
-                    mode === "remove" ? "devices.removeFromDevice" : "devices.leaveOnDevice",
-                  )}</button
                 >
+                  {i18n.t(mode === "remove" ? "devices.removeFromDevice" : "devices.leaveOnDevice")}
+                </button>
               {/each}
             </div>
             <p class="text-xs text-brand-text-secondary">
@@ -583,9 +590,9 @@
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="convert-mode" class="text-sm font-semibold text-brand-text-primary"
-              >{i18n.t("devices.convert")}</label
-            >
+            <label for="convert-mode" class="text-sm font-semibold text-brand-text-primary">
+              {i18n.t("devices.convert")}
+            </label>
             <Select
               id="convert-mode"
               value={draft.convert.mode}
@@ -594,9 +601,9 @@
               class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
             >
               {#each CONVERT_MODES as mode (mode)}
-                <option value={mode}
-                  >{i18n.t(`devices.convertMode.${mode}`, { device: name })}</option
-                >
+                <option value={mode}>
+                  {i18n.t(`devices.convertMode.${mode}`, { device: name })}
+                </option>
               {/each}
             </Select>
             {#if draft.convert.mode !== "never"}
@@ -643,8 +650,9 @@
             <label
               for="device-folder-template"
               class="text-sm font-semibold text-brand-text-primary"
-              >{i18n.t("devices.foldersOnDevice")}</label
             >
+              {i18n.t("devices.foldersOnDevice")}
+            </label>
             <TemplateInput
               id="device-folder-template"
               value={draft.layout.folderTemplate}
@@ -656,9 +664,9 @@
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="playlist-files" class="text-sm font-semibold text-brand-text-primary"
-              >{i18n.t("devices.playlistFiles")}</label
-            >
+            <label for="playlist-files" class="text-sm font-semibold text-brand-text-primary">
+              {i18n.t("devices.playlistFiles")}
+            </label>
             <Select
               id="playlist-files"
               value={draft.layout.playlistFormat}
@@ -671,9 +679,9 @@
               class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
             >
               {#each ["m3u8", "m3uAscii", "pls", "none"] as const as format (format)}
-                <option value={format}
-                  >{i18n.t(`devices.playlistFormat.${format}`, { folder: playlistFolder })}</option
-                >
+                <option value={format}>
+                  {i18n.t(`devices.playlistFormat.${format}`, { folder: playlistFolder })}
+                </option>
               {/each}
             </Select>
           </div>
@@ -689,9 +697,9 @@
             </button>
             {#if moreOpen}
               <div class="flex flex-col gap-1.5">
-                <label for="art-size" class="text-sm font-semibold text-brand-text-primary"
-                  >{i18n.t("devices.artSize")}</label
-                >
+                <label for="art-size" class="text-sm font-semibold text-brand-text-primary">
+                  {i18n.t("devices.artSize")}
+                </label>
                 <Select
                   id="art-size"
                   value={String(draft.convert.maxArtPx ?? "")}
@@ -705,18 +713,16 @@
                   class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
                 >
                   {#each ART_SIZES as px (px ?? "keep")}
-                    <option value={String(px ?? "")}
-                      >{px === null
-                        ? i18n.t("devices.artKeep")
-                        : i18n.t("devices.artPx", { px })}</option
-                    >
+                    <option value={String(px ?? "")}>
+                      {px === null ? i18n.t("devices.artKeep") : i18n.t("devices.artPx", { px })}
+                    </option>
                   {/each}
                 </Select>
               </div>
               <div class="flex flex-col gap-1.5">
-                <label for="path-separator" class="text-sm font-semibold text-brand-text-primary"
-                  >{i18n.t("devices.pathSeparator")}</label
-                >
+                <label for="path-separator" class="text-sm font-semibold text-brand-text-primary">
+                  {i18n.t("devices.pathSeparator")}
+                </label>
                 <Select
                   id="path-separator"
                   value={draft.layout.pathSeparator}
@@ -733,9 +739,9 @@
                 </Select>
               </div>
               <div class="flex flex-col gap-1.5">
-                <label for="reserve" class="text-sm font-semibold text-brand-text-primary"
-                  >{i18n.t("devices.spaceToKeepFree")}</label
-                >
+                <label for="reserve" class="text-sm font-semibold text-brand-text-primary">
+                  {i18n.t("devices.spaceToKeepFree")}
+                </label>
                 <div class="flex items-center gap-2">
                   <input
                     id="reserve"

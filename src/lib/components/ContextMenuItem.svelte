@@ -57,9 +57,9 @@
   />
   <span class:font-semibold={isDefault}>{label}</span>
   {#if isDefault}
-    <kbd class="ml-auto pl-4 font-sans text-[11px] text-brand-text-secondary" aria-hidden="true"
-      >↵</kbd
-    >
+    <kbd class="ml-auto pl-4 font-sans text-[11px] text-brand-text-secondary" aria-hidden="true">
+      ↵
+    </kbd>
   {:else if shortcut}
     <kbd class="ml-auto pl-4 font-sans text-[11px] text-brand-text-secondary">{shortcut}</kbd>
   {/if}

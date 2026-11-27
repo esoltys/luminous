@@ -86,8 +86,10 @@
               class="truncate font-medium {inSync
                 ? 'text-brand-accent-text'
                 : 'text-brand-text-primary'}"
-              title={name}>{name}</span
+              title={name}
             >
+              {name}
+            </span>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             {#if inSync}

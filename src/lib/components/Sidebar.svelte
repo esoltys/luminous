@@ -485,9 +485,9 @@
             <LightningSlash class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
           </div>
           {#if !layoutCollapsed}
-            <span class="truncate text-left flex-1 min-w-0"
-              >{i18n.t("sidebar.connectIntegrations", {}, "Connect...")}</span
-            >
+            <span class="truncate text-left flex-1 min-w-0">
+              {i18n.t("sidebar.connectIntegrations", {}, "Connect...")}
+            </span>
           {/if}
         </button>
       {/if}

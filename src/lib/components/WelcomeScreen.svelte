@@ -36,14 +36,16 @@
       <button
         onclick={() => openExternalUrl(legalDocUrl("terms", i18n.currentLocale))}
         class="text-brand-text-secondary underline hover:text-brand-accent-text transition-colors"
-        >{i18n.t("welcome.termsOfService")}</button
       >
+        {i18n.t("welcome.termsOfService")}
+      </button>
       {i18n.t("welcome.and")}
       <button
         onclick={() => openExternalUrl(legalDocUrl("privacy", i18n.currentLocale))}
         class="text-brand-text-secondary underline hover:text-brand-accent-text transition-colors"
-        >{i18n.t("welcome.privacyPolicy")}</button
-      >.
+      >
+        {i18n.t("welcome.privacyPolicy")}
+      </button>.
     </p>
     <!-- First-run language choice: the OS language is applied on first launch (see
          i18n.init), and this is the way out when that guess is wrong. Native names, so

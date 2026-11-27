@@ -527,9 +527,9 @@
               </div>
               <div class="space-y-1.5 text-[11px]">
                 <div class="flex items-center flex-wrap gap-1.5">
-                  <span class="font-medium text-brand-text-secondary min-w-12"
-                    >{i18n.t("files.filterHelpTypeLabel")}</span
-                  >
+                  <span class="font-medium text-brand-text-secondary min-w-12">
+                    {i18n.t("files.filterHelpTypeLabel")}
+                  </span>
                   {#each ["ext:flac", "ext:cue", "ext:md", "ext:jpg"] as token (token)}
                     <button
                       type="button"
@@ -541,9 +541,9 @@
                   {/each}
                 </div>
                 <div class="flex items-center flex-wrap gap-1.5">
-                  <span class="font-medium text-brand-text-secondary min-w-12"
-                    >{i18n.t("files.filterHelpStatusLabel")}</span
-                  >
+                  <span class="font-medium text-brand-text-secondary min-w-12">
+                    {i18n.t("files.filterHelpStatusLabel")}
+                  </span>
                   {#each ["status:library", "status:unscanned"] as token (token)}
                     <button
                       type="button"
@@ -604,9 +604,9 @@
                     </div>
                   </div>
                 </div>
-                <span class="text-xs font-semibold text-brand-accent-text group-hover:underline"
-                  >{i18n.t("topNav.openBuilder")}</span
-                >
+                <span class="text-xs font-semibold text-brand-accent-text group-hover:underline">
+                  {i18n.t("topNav.openBuilder")}
+                </span>
               </button>
             {/if}
 
@@ -619,9 +619,9 @@
                 </div>
                 <div class="space-y-0.5 text-[11px]">
                   <div>
-                    <span class="font-medium text-brand-text-primary"
-                      >{i18n.t("topNav.filterFieldsLabel")}</span
-                    > <code class="bg-brand-sidebar px-1 rounded">artist</code>,
+                    <span class="font-medium text-brand-text-primary">
+                      {i18n.t("topNav.filterFieldsLabel")}
+                    </span> <code class="bg-brand-sidebar px-1 rounded">artist</code>,
                     <code class="bg-brand-sidebar px-1 rounded">album</code>,
                     <code class="bg-brand-sidebar px-1 rounded">title</code>,
                     <code class="bg-brand-sidebar px-1 rounded">genre</code>,
@@ -631,9 +631,9 @@
                     <code class="bg-brand-sidebar px-1 rounded">playcount</code>
                   </div>
                   <div>
-                    <span class="font-medium text-brand-text-primary"
-                      >{i18n.t("topNav.filterOperatorsLabel")}</span
-                    > <code class="bg-brand-sidebar px-1 rounded">=</code>
+                    <span class="font-medium text-brand-text-primary">
+                      {i18n.t("topNav.filterOperatorsLabel")}
+                    </span> <code class="bg-brand-sidebar px-1 rounded">=</code>
                     <code class="bg-brand-sidebar px-1 rounded">!=</code>
                     <code class="bg-brand-sidebar px-1 rounded">&gt;</code>
                     <code class="bg-brand-sidebar px-1 rounded">&gt;=</code>

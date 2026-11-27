@@ -529,9 +529,9 @@
       </div>
     {:else if isEditing}
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">
-        <label for="lyrics-editor" class="label-heading text-brand-text-secondary"
-          >{i18n.t("lyrics.editorLabel", {}, "Lyrics Text (plain or LRC synced format)")}</label
-        >
+        <label for="lyrics-editor" class="label-heading text-brand-text-secondary">
+          {i18n.t("lyrics.editorLabel", {}, "Lyrics Text (plain or LRC synced format)")}
+        </label>
         <textarea
           id="lyrics-editor"
           bind:value={editText}
@@ -564,8 +564,10 @@
                     <span
                       class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung
                         ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]'
-                        : LYRIC_WORD_UNSUNG}">{word.text}</span
+                        : LYRIC_WORD_UNSUNG}"
                     >
+                      {word.text}
+                    </span>
                   {/each}
                 {:else}
                   {line.text || "•••"}

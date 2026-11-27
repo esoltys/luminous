@@ -364,9 +364,9 @@
                       class="w-[28%] h-[28%] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]"
                     />
                   {:else if !cell.future}
-                    <span class="text-xs font-medium leading-none text-brand-text-primary"
-                      >{dateFromKey(cell.date).getDate()}</span
-                    >
+                    <span class="text-xs font-medium leading-none text-brand-text-primary">
+                      {dateFromKey(cell.date).getDate()}
+                    </span>
                   {/if}
                   {#if !cell.future && cell.minutes > 0}
                     <span class="text-[9px] leading-none text-brand-text-primary">
@@ -431,9 +431,9 @@
     {/if}
 
     <div class="flex items-center justify-between gap-4 mt-3 pt-3 border-t border-brand-border/60">
-      <span class="text-xs text-brand-text-secondary truncate min-w-0"
-        >{displayCell ? cellLabel(displayCell) : ""}</span
-      >
+      <span class="text-xs text-brand-text-secondary truncate min-w-0">
+        {displayCell ? cellLabel(displayCell) : ""}
+      </span>
       <div class="flex items-center gap-1.5 text-[10px] text-brand-text-secondary shrink-0">
         <span>{i18n.t("stats.heatmapLegendLess", {}, "Less")}</span>
         {#each LEVEL_OPACITY as opacity (opacity)}

@@ -172,8 +172,9 @@
               title={i18n.t(choice.label)}
             >
               <Icon class="w-5 h-5" />
-              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span
-              >
+              <span class="text-[10px] font-medium truncate max-w-full">
+                {i18n.t(choice.label)}
+              </span>
             </button>
           {/each}
         </div>

@@ -227,9 +227,9 @@
             )}
           >
             <ExternalLink class="w-3.5 h-3.5 text-brand-accent" />
-            <span class="hidden sm:inline"
-              >{i18n.t("markdownEditor.openExternal", {}, "Open in external editor")}</span
-            >
+            <span class="hidden sm:inline">
+              {i18n.t("markdownEditor.openExternal", {}, "Open in external editor")}
+            </span>
           </button>
 
           <!-- Close Button -->
@@ -251,13 +251,13 @@
         >
           <div class="flex items-center gap-2 min-w-0">
             <Warning class="w-4 h-4 text-brand-text-primary shrink-0" />
-            <span class="truncate"
-              >{i18n.t(
+            <span class="truncate">
+              {i18n.t(
                 "markdownEditor.conflictDetected",
                 {},
                 "This file was modified on disk by an external editor.",
-              )}</span
-            >
+              )}
+            </span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <button
@@ -310,25 +310,29 @@
       <div
         class="px-4 sm:px-6 py-2 border-t border-brand-border/60 bg-brand-sidebar/40 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-text-secondary select-none shrink-0"
       >
-        <span class="font-medium text-brand-text-secondary"
-          >{i18n.t("markdownEditor.syntaxTitle", {}, "Formatting:")}</span
-        >
+        <span class="font-medium text-brand-text-secondary">
+          {i18n.t("markdownEditor.syntaxTitle", {}, "Formatting:")}
+        </span>
         <code
           class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
-          >**{i18n.t("markdownEditor.bold", {}, "bold")}**</code
         >
+          **{i18n.t("markdownEditor.bold", {}, "bold")}**
+        </code>
         <code
           class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
-          >*{i18n.t("markdownEditor.italic", {}, "italic")}*</code
         >
+          *{i18n.t("markdownEditor.italic", {}, "italic")}*
+        </code>
         <code
           class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
-          >[{i18n.t("markdownEditor.linkText", {}, "link")}](url)</code
         >
+          [{i18n.t("markdownEditor.linkText", {}, "link")}](url)
+        </code>
         <code
           class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
-          >https://...</code
         >
+          https://...
+        </code>
       </div>
 
       <!-- Footer -->

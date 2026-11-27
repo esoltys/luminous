@@ -209,9 +209,9 @@
               <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
                 {titleFor(item)}
               </p>
-              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
-                >{yearFor(item)}</span
-              >
+              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">
+                {yearFor(item)}
+              </span>
             </div>
             <div class="flex items-center justify-between gap-2">
               <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
@@ -244,17 +244,17 @@
               <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
                 {titleFor(item)}
               </p>
-              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
-                >{trailingLabel(item)}</span
-              >
+              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">
+                {trailingLabel(item)}
+              </span>
             </div>
             <div class="flex items-center justify-between gap-2">
               <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
                 {subtitleFor(item)}
               </p>
-              <span class="text-xs text-brand-text-secondary truncate shrink-0"
-                >{trackCountFor(item)}</span
-              >
+              <span class="text-xs text-brand-text-secondary truncate shrink-0">
+                {trackCountFor(item)}
+              </span>
             </div>
           </div>
         {/if}

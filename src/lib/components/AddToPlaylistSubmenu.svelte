@@ -78,8 +78,10 @@
           <Radio class="w-3.5 h-3.5 shrink-0 text-brand-accent-text" />
           <span
             class="truncate flex-1 font-medium text-brand-text-primary"
-            title={activeCustom.name}>{activeCustom.name}</span
+            title={activeCustom.name}
           >
+            {activeCustom.name}
+          </span>
           <span
             class="label-small text-brand-accent-text px-1 py-0.5 rounded bg-brand-accent/15 shrink-0"
           >

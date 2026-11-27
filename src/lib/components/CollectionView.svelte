@@ -662,23 +662,26 @@
                     >
                       <option value="album-true">▲ {i18n.t("collection.tableHeaderAlbum")}</option>
                       <option value="album-false">▼ {i18n.t("collection.tableHeaderAlbum")}</option>
-                      <option value="artist-true">▲ {i18n.t("collection.tableHeaderArtist")}</option
-                      >
-                      <option value="artist-false"
-                        >▼ {i18n.t("collection.tableHeaderArtist")}</option
-                      >
+                      <option value="artist-true">
+                        ▲ {i18n.t("collection.tableHeaderArtist")}
+                      </option>
+                      <option value="artist-false">
+                        ▼ {i18n.t("collection.tableHeaderArtist")}
+                      </option>
                       <option value="year-true">▲ {i18n.t("collection.tableHeaderYear")}</option>
                       <option value="year-false">▼ {i18n.t("collection.tableHeaderYear")}</option>
-                      <option value="rating-true">▲ {i18n.t("collection.tableHeaderRating")}</option
-                      >
-                      <option value="rating-false"
-                        >▼ {i18n.t("collection.tableHeaderRating")}</option
-                      >
-                      <option value="added-true">▲ {i18n.t("collection.sortDateAddedLabel")}</option
-                      >
-                      <option value="added-false"
-                        >▼ {i18n.t("collection.sortDateAddedLabel")}</option
-                      >
+                      <option value="rating-true">
+                        ▲ {i18n.t("collection.tableHeaderRating")}
+                      </option>
+                      <option value="rating-false">
+                        ▼ {i18n.t("collection.tableHeaderRating")}
+                      </option>
+                      <option value="added-true">
+                        ▲ {i18n.t("collection.sortDateAddedLabel")}
+                      </option>
+                      <option value="added-false">
+                        ▼ {i18n.t("collection.sortDateAddedLabel")}
+                      </option>
                     </Select>
                   </div>
                 {:else if navigationStore.activeSubTab === "artists"}
@@ -697,18 +700,18 @@
                       <option value="name-false">▼ {i18n.t("collection.tableHeaderArtist")}</option>
                       <option value="genre-true">▲ {i18n.t("collection.tableHeaderGenre")}</option>
                       <option value="genre-false">▼ {i18n.t("collection.tableHeaderGenre")}</option>
-                      <option value="song_count-true"
-                        >▲ {i18n.t("collection.sortLabelSongs")}</option
-                      >
-                      <option value="song_count-false"
-                        >▼ {i18n.t("collection.sortLabelSongs")}</option
-                      >
-                      <option value="total_playcount-true"
-                        >▲ {i18n.t("collection.sortLabelPopularity")}</option
-                      >
-                      <option value="total_playcount-false"
-                        >▼ {i18n.t("collection.sortLabelPopularity")}</option
-                      >
+                      <option value="song_count-true">
+                        ▲ {i18n.t("collection.sortLabelSongs")}
+                      </option>
+                      <option value="song_count-false">
+                        ▼ {i18n.t("collection.sortLabelSongs")}
+                      </option>
+                      <option value="total_playcount-true">
+                        ▲ {i18n.t("collection.sortLabelPopularity")}
+                      </option>
+                      <option value="total_playcount-false">
+                        ▼ {i18n.t("collection.sortLabelPopularity")}
+                      </option>
                     </Select>
                   </div>
                 {/if}

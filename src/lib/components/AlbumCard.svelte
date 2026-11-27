@@ -121,9 +121,9 @@
             {album.artist}
           </LinkButton>
         {:else}
-          <span class="text-xs text-brand-text-secondary text-left truncate min-w-0 font-medium"
-            >{i18n.t("collection.variousArtists")}</span
-          >
+          <span class="text-xs text-brand-text-secondary text-left truncate min-w-0 font-medium">
+            {i18n.t("collection.variousArtists")}
+          </span>
         {/if}
       {:else}
         <span></span>

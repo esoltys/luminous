@@ -702,9 +702,9 @@
       {#if isLiveSong(song)}
         <span class="{secondaryColor(song)} truncate min-w-0">—</span>
       {:else if disabledPlaceholder && rowDisabled(row)}
-        <span class="text-brand-text-secondary italic text-xs truncate min-w-0"
-          >{song.artist || row.disabledTooltip}</span
-        >
+        <span class="text-brand-text-secondary italic text-xs truncate min-w-0">
+          {song.artist || row.disabledTooltip}
+        </span>
       {:else if song.artist}
         {#each parseMultiValue(song.artist) as name, i (name)}
           {#if i > 0}<span class="{secondaryColor(song)}/50 shrink-0">,&nbsp;</span>{/if}
@@ -720,17 +720,17 @@
           </LinkButton>
         {/each}
       {:else}
-        <span class="{secondaryColor(song)} truncate min-w-0"
-          >{i18n.t("collection.unknownArtist")}</span
-        >
+        <span class="{secondaryColor(song)} truncate min-w-0">
+          {i18n.t("collection.unknownArtist")}
+        </span>
       {/if}
     </div>
   {:else if col.key === "album"}
     <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
       {#if disabledPlaceholder && rowDisabled(row)}
-        <span class="text-brand-text-secondary italic text-xs truncate min-w-0"
-          >{song.album ?? ""}</span
-        >
+        <span class="text-brand-text-secondary italic text-xs truncate min-w-0">
+          {song.album ?? ""}
+        </span>
       {:else if song.album}
         <LinkButton
           onclick={(e) => {
@@ -890,9 +890,9 @@
       {#if dir}
         <LibraryBadge directory={dir} size="xs" />
       {:else if song.source === "opened_file"}
-        <span class="{secondaryColor(song)} truncate text-xs font-medium italic"
-          >{i18n.t("collection.notInLibrary")}</span
-        >
+        <span class="{secondaryColor(song)} truncate text-xs font-medium italic">
+          {i18n.t("collection.notInLibrary")}
+        </span>
       {:else}
         <span class="{secondaryColor(song)} text-xs font-medium">—</span>
       {/if}
@@ -957,8 +957,9 @@
     {:else if mode === "position"}
       <span
         class="absolute text-xs font-medium text-brand-text-primary group-hover:opacity-0 transition-opacity"
-        >{displayIndex + 1}</span
       >
+        {displayIndex + 1}
+      </span>
     {/if}
     {#if song}
       <button
@@ -1061,9 +1062,10 @@
         onclick={() => onToggleSort(positionSortField)}
         class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 min-w-0"
       >
-        {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]"
-            >{i18n.t("playlists.tableHeaderTrack")} {arrow}</span
-          >{/snippet}
+        {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">
+            {i18n.t("playlists.tableHeaderTrack")}
+            {arrow}
+          </span>{/snippet}
       </SortableHeader>
     {:else}
       <div class="text-center w-9"></div>

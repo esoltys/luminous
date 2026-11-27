@@ -724,9 +724,9 @@
         <div
           class="flex items-center gap-2 bg-brand-main border border-brand-border rounded-[2rem] px-4 py-1.5"
         >
-          <label for="eq-preset-picker" class="text-xs font-semibold text-brand-text-secondary"
-            >{i18n.t("equalizer.presetLabel")}:</label
-          >
+          <label for="eq-preset-picker" class="text-xs font-semibold text-brand-text-secondary">
+            {i18n.t("equalizer.presetLabel")}:
+          </label>
           <EqPresetPicker
             id="eq-preset-picker"
             value={activePreset}
@@ -756,9 +756,9 @@
         <div
           class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-2xl px-4 py-1.5"
         >
-          <label for="eq-preamp" class="text-xs font-semibold text-brand-text-secondary"
-            >{i18n.t("equalizer.preamp")}:</label
-          >
+          <label for="eq-preamp" class="text-xs font-semibold text-brand-text-secondary">
+            {i18n.t("equalizer.preamp")}:
+          </label>
           {#if ranges}
             {@const preampRange = ranges.eq.preamp}
             <div class="w-48 flex flex-col pt-1">
@@ -921,9 +921,9 @@
             >
               {i18n.t("equalizer.importChooseFile")}
             </button>
-            <span class="text-xs text-brand-text-secondary"
-              >{i18n.t("equalizer.importOrPaste")}</span
-            >
+            <span class="text-xs text-brand-text-secondary">
+              {i18n.t("equalizer.importOrPaste")}
+            </span>
           </div>
           <textarea
             bind:value={importPanel.text}
@@ -1085,9 +1085,9 @@
       </div>
 
       <div class="flex flex-col items-center justify-center gap-1.5 h-full">
-        <span class="label-small text-brand-text-secondary text-center"
-          >{i18n.t("loudness.mode")}</span
-        >
+        <span class="label-small text-brand-text-secondary text-center">
+          {i18n.t("loudness.mode")}
+        </span>
         <div
           class="relative flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5 mt-1 mx-auto w-full max-w-[200px]"
           role="group"
@@ -1140,9 +1140,9 @@
             size={80}
           />
         {/if}
-        <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4 text-pretty"
-          >{i18n.t("loudness.fallbackGainHint")}</span
-        >
+        <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4 text-pretty">
+          {i18n.t("loudness.fallbackGainHint")}
+        </span>
       </div>
     </div>
 
@@ -1217,9 +1217,9 @@
 
     <div class="flex flex-col gap-1.5 border-t border-brand-border pt-6">
       <div class="flex items-center justify-between mb-4">
-        <span class="text-sm font-bold text-brand-text-primary"
-          >{i18n.t("fades.crossfadeAuto")}</span
-        >
+        <span class="text-sm font-bold text-brand-text-primary">
+          {i18n.t("fades.crossfadeAuto")}
+        </span>
         <Toggle
           checked={crossfadeAutoEnabled}
           onchange={(v) => {
@@ -1233,12 +1233,12 @@
         {@const crossfadeRange = ranges.crossfade_auto_duration_secs}
         <div class="flex items-center justify-between text-xs text-brand-text-secondary">
           <span>{i18n.t("fades.crossfadeDuration")}</span>
-          <span class="font-mono font-bold text-brand-text-primary"
-            >{formatNumber(crossfadeAutoDurationSecs, {
+          <span class="font-mono font-bold text-brand-text-primary">
+            {formatNumber(crossfadeAutoDurationSecs, {
               minimumFractionDigits: 1,
               maximumFractionDigits: 1,
-            })}s</span
-          >
+            })}s
+          </span>
         </div>
         <input
           type="range"
@@ -1260,12 +1260,12 @@
                   100}%"
               >
                 <div class="h-1 w-[1px] bg-brand-border mb-0.5"></div>
-                <span
-                  >{formatNumber(val, {
+                <span>
+                  {formatNumber(val, {
                     minimumFractionDigits: 1,
                     maximumFractionDigits: 1,
-                  })}s</span
-                >
+                  })}s
+                </span>
               </div>
             {/each}
           </div>

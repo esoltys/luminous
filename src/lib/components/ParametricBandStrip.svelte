@@ -136,9 +136,9 @@
           chevronPosition="0.375rem"
         >
           {#each KINDS as k}
-            <option value={k.kind} class="bg-brand-main text-brand-text-primary"
-              >{i18n.t(k.key)}</option
-            >
+            <option value={k.kind} class="bg-brand-main text-brand-text-primary">
+              {i18n.t(k.key)}
+            </option>
           {/each}
         </Select>
         <input

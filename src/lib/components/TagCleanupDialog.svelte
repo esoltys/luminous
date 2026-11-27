@@ -200,9 +200,9 @@
                   {/if}
                 </span>
                 {#if group.entries.length > 1}
-                  <span class="shrink-0 tabular-nums text-brand-text-secondary"
-                    >×{formatNumber(group.entries.length)}</span
-                  >
+                  <span class="shrink-0 tabular-nums text-brand-text-secondary">
+                    ×{formatNumber(group.entries.length)}
+                  </span>
                 {/if}
               </label>
             {/each}
@@ -231,13 +231,13 @@
       <Button onclick={() => tagCleanupStore.cancel()} variant="secondary" size="sm">
         {i18n.t("tagCleanup.cancelBtn")}
       </Button>
-      <Button onclick={onClose} variant="primary" size="sm"
-        >{i18n.t("tagCleanup.backgroundBtn")}</Button
-      >
+      <Button onclick={onClose} variant="primary" size="sm">
+        {i18n.t("tagCleanup.backgroundBtn")}
+      </Button>
     {:else}
-      <Button onclick={onClose} variant="secondary" size="sm"
-        >{i18n.t("tagCleanup.closeBtn")}</Button
-      >
+      <Button onclick={onClose} variant="secondary" size="sm">
+        {i18n.t("tagCleanup.closeBtn")}
+      </Button>
     {/if}
   </div>
 </Modal>

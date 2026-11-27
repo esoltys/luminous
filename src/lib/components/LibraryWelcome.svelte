@@ -102,15 +102,17 @@
           navigationStore.openHelp("getting-started");
         }}
         class="text-brand-text-secondary underline-offset-2 hover:underline hover:text-brand-accent-text transition-colors"
-        >{i18n.t("sidebar.help")}</button
       >
+        {i18n.t("sidebar.help")}
+      </button>
       <span class="text-brand-border" aria-hidden="true">·</span>
       <button
         type="button"
         onclick={() => walkthroughStore.start()}
         class="text-brand-text-secondary underline-offset-2 hover:underline hover:text-brand-accent-text transition-colors"
-        >{i18n.t("walkthrough.takeTour", {}, "Take a quick tour")}</button
       >
+        {i18n.t("walkthrough.takeTour", {}, "Take a quick tour")}
+      </button>
     </div>
   {/if}
 </div>

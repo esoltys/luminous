@@ -178,8 +178,9 @@
           <option value="name-true">▲ {i18n.t("songTags.sortName", {}, "Name")}</option>
           <option value="name-false">▼ {i18n.t("songTags.sortName", {}, "Name")}</option>
           <option value="count-true">▲ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option>
-          <option value="count-false">▼ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option
-          >
+          <option value="count-false">
+            ▼ {i18n.t("songTags.sortSongCount", {}, "Song Count")}
+          </option>
         </Select>
       </div>
     {/snippet}

@@ -185,9 +185,9 @@
         <!-- Toggles moved from Settings view -->
         <div class="space-y-1.5 py-0.5">
           <div class="flex items-center justify-between gap-3">
-            <span class="text-xs text-brand-text-secondary leading-snug"
-              >{i18n.t("listenbrainz.pauseLabel")}</span
-            >
+            <span class="text-xs text-brand-text-secondary leading-snug">
+              {i18n.t("listenbrainz.pauseLabel")}
+            </span>
             <Toggle
               checked={scrobblerStore.paused}
               onchange={(v) => scrobblerStore.setPaused(v)}
@@ -197,9 +197,9 @@
           </div>
 
           <div class="flex items-center justify-between gap-3">
-            <span class="text-xs text-brand-text-secondary leading-snug"
-              >{i18n.t("listenbrainz.nowPlayingLabel")}</span
-            >
+            <span class="text-xs text-brand-text-secondary leading-snug">
+              {i18n.t("listenbrainz.nowPlayingLabel")}
+            </span>
             <Toggle
               checked={scrobblerStore.nowPlayingEnabled}
               onchange={(v) => scrobblerStore.setNowPlayingEnabled(v)}
@@ -270,9 +270,9 @@
               )}
             class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
           >
-            <span class="hover:underline"
-              >{i18n.t("auth.lastfmProfile", {}, "Last.fm listener profile")}</span
-            >
+            <span class="hover:underline">
+              {i18n.t("auth.lastfmProfile", {}, "Last.fm listener profile")}
+            </span>
             <ArrowUpRight class="w-3.5 h-3.5" />
           </button>
         {/if}
@@ -284,9 +284,9 @@
               openExternalUrl(`https://listenbrainz.org/user/${encodeURIComponent(lbUsername!)}/`)}
             class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
           >
-            <span class="hover:underline"
-              >{i18n.t("auth.listenbrainzProfile", {}, "ListenBrainz listener profile")}</span
-            >
+            <span class="hover:underline">
+              {i18n.t("auth.listenbrainzProfile", {}, "ListenBrainz listener profile")}
+            </span>
             <ArrowUpRight class="w-3.5 h-3.5" />
           </button>
         {/if}
@@ -298,9 +298,9 @@
               openExternalUrl(`https://musicbrainz.org/user/${encodeURIComponent(mbUsername!)}`)}
             class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
           >
-            <span class="hover:underline"
-              >{i18n.t("auth.musicbrainzProfile", {}, "MusicBrainz editor profile")}</span
-            >
+            <span class="hover:underline">
+              {i18n.t("auth.musicbrainzProfile", {}, "MusicBrainz editor profile")}
+            </span>
             <ArrowUpRight class="w-3.5 h-3.5" />
           </button>
         {/if}
@@ -314,9 +314,9 @@
         onclick={handleOpenScrobblerSettings}
         class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
       >
-        <span class="hover:underline"
-          >{i18n.t("auth.integrationSettings", {}, "Integration settings")}</span
-        >
+        <span class="hover:underline">
+          {i18n.t("auth.integrationSettings", {}, "Integration settings")}
+        </span>
         <ArrowRight class="w-3.5 h-3.5" />
       </button>
     </div>

@@ -920,11 +920,11 @@
       <!-- The icons carry folder-vs-file visually; screen readers get it in words.
            Labels wrap rather than truncate: the deepest row is the narrowest. -->
       <span aria-hidden="true" class="min-w-0 break-words">{i18n.t(row.labelKey)}</span>
-      <span class="sr-only"
-        >{i18n.t(row.kind === "file" ? "organizer.outlineFileSr" : "organizer.outlineFolderSr", {
+      <span class="sr-only">
+        {i18n.t(row.kind === "file" ? "organizer.outlineFileSr" : "organizer.outlineFolderSr", {
           name: i18n.t(row.labelKey),
-        })}</span
-      >
+        })}
+      </span>
     </span>
     <!-- Word break between rows in the accessible description. Rows are
          block-level (display: flex), so this whitespace is never painted. -->
@@ -976,8 +976,9 @@
           <span
             id="preset-{preset.id}-label"
             class="font-semibold text-sm text-brand-text-primary block"
-            >{i18n.t(preset.labelKey)}</span
           >
+            {i18n.t(preset.labelKey)}
+          </span>
           <span id="preset-{preset.id}-outline" class="block mt-1.5 text-[11px]">
             {@render presetOutline(preset)}
           </span>
@@ -989,12 +990,12 @@
         aria-label={i18n.t("organizer.presetCustom")}
         class={presetCardClass(templatePreset === "custom")}
       >
-        <span class="font-semibold text-sm text-brand-text-primary block"
-          >{i18n.t("organizer.presetCustom")}</span
-        >
-        <span class="text-[11px] text-brand-text-secondary block mt-1.5"
-          >{i18n.t("organizer.presetCustomHint")}</span
-        >
+        <span class="font-semibold text-sm text-brand-text-primary block">
+          {i18n.t("organizer.presetCustom")}
+        </span>
+        <span class="text-[11px] text-brand-text-secondary block mt-1.5">
+          {i18n.t("organizer.presetCustomHint")}
+        </span>
       </button>
     </div>
 
@@ -1009,9 +1010,9 @@
     {/if}
 
     <div>
-      <span class="label-small text-brand-text-secondary"
-        >{i18n.t("organizer.templateSampleOutputLabel")}</span
-      >
+      <span class="label-small text-brand-text-secondary">
+        {i18n.t("organizer.templateSampleOutputLabel")}
+      </span>
       <div
         class="mt-1.5 bg-brand-main/50 border border-brand-border/60 rounded-xl p-3 max-h-40 overflow-y-auto"
       >
@@ -1026,9 +1027,9 @@
 {#snippet destinationSection()}
   <div class="space-y-4">
     <div>
-      <span class="block font-semibold text-brand-text-primary mb-1.5"
-        >{i18n.t("organizer.destinationDirLabel")}</span
-      >
+      <span class="block font-semibold text-brand-text-primary mb-1.5">
+        {i18n.t("organizer.destinationDirLabel")}
+      </span>
       <div
         class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50 w-full"
       >
@@ -1518,9 +1519,9 @@
             {#if activePreset}
               <!-- A preset reads as its name plus outline, like its card; only Custom shows the pattern. -->
               <span class="min-w-0 text-xs">
-                <span class="block font-medium text-brand-text-primary"
-                  >{i18n.t(activePreset.labelKey)}</span
-                >
+                <span class="block font-medium text-brand-text-primary">
+                  {i18n.t(activePreset.labelKey)}
+                </span>
                 <span class="block mt-1 text-[11px]">{@render presetOutline(activePreset)}</span>
               </span>
             {:else}

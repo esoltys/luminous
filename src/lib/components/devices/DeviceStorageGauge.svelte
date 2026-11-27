@@ -76,9 +76,9 @@
     <div class="min-w-0">{@render switcher?.()}</div>
     <div class="flex items-center gap-1 text-xs text-brand-text-secondary">
       <span>{storage.filesystem}.</span>
-      <span class="font-semibold text-brand-text-primary"
-        >{i18n.t("devices.free", { size: formatStorageSize(storage.freeBytes) })}</span
-      >
+      <span class="font-semibold text-brand-text-primary">
+        {i18n.t("devices.free", { size: formatStorageSize(storage.freeBytes) })}
+      </span>
     </div>
   </div>
   {#if usage}
