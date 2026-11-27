@@ -576,9 +576,9 @@
     {#if collectionStore.directories.length > 0}
       <div class="flex items-center justify-between gap-4 pt-2">
         <div class="flex flex-col gap-0.5 min-w-0">
-          <label for="default-library-select" class="text-sm font-medium text-brand-text-primary"
-            >{i18n.t("settings.defaultLibraryLabel")}</label
-          >
+          <label for="default-library-select" class="text-sm font-medium text-brand-text-primary">
+            {i18n.t("settings.defaultLibraryLabel")}
+          </label>
           <p class="text-xs text-brand-text-secondary">{i18n.t("settings.defaultLibraryHint")}</p>
           {#if defaultLibraryError}
             <InlineMessage role="alert">{defaultLibraryError}</InlineMessage>
@@ -965,10 +965,9 @@
             phase: getPhaseDisplayName(collectionStore.scanProgress?.phase),
           })}
         </span>
-        <span
-          >{collectionStore.scanProgress?.scanned || 0} / {collectionStore.scanProgress?.total ||
-            0}</span
-        >
+        <span>
+          {collectionStore.scanProgress?.scanned || 0} / {collectionStore.scanProgress?.total || 0}
+        </span>
       </div>
       <div
         class="w-full bg-brand-sidebar rounded-full h-2 overflow-hidden border border-brand-border/40"
@@ -1013,9 +1012,9 @@
   <div class="pt-3 space-y-4">
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.watchRealtimeLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.watchRealtimeLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary text-pretty">
           {i18n.t("settings.watchRealtimeHint")}
         </p>
@@ -1029,9 +1028,9 @@
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.scanOnStartupLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.scanOnStartupLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary text-pretty">
           {i18n.t("settings.scanOnStartupHint")}
         </p>
@@ -1045,9 +1044,9 @@
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.autoOrganizeLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.autoOrganizeLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary text-pretty">
           {i18n.t("settings.autoOrganizeHint")}
         </p>
@@ -1061,9 +1060,9 @@
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.saveArtworkToFoldersLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.saveArtworkToFoldersLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary text-pretty">
           {i18n.t("settings.saveArtworkToFoldersHint")}
         </p>
@@ -1078,9 +1077,9 @@
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.verifyAudioBackgroundLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.verifyAudioBackgroundLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary text-pretty">
           {i18n.t("settings.verifyAudioBackgroundHint")}
         </p>
@@ -1094,9 +1093,9 @@
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.suggestFoldersLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.suggestFoldersLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary text-pretty">
           {i18n.t("settings.suggestFoldersHint")}
         </p>
@@ -1138,16 +1137,17 @@
         </p>
       </div>
       <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-        <span class="label-heading text-brand-text-secondary">{i18n.t("settings.statsAlbums")}</span
-        >
+        <span class="label-heading text-brand-text-secondary">
+          {i18n.t("settings.statsAlbums")}
+        </span>
         <p class="text-base font-bold text-brand-text-primary mt-0.5">
           {formatNumber(collectionStore.stats.total_albums)}
         </p>
       </div>
       <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-        <span class="label-heading text-brand-text-secondary"
-          >{i18n.t("settings.statsArtists")}</span
-        >
+        <span class="label-heading text-brand-text-secondary">
+          {i18n.t("settings.statsArtists")}
+        </span>
         <p class="text-base font-bold text-brand-text-primary mt-0.5">
           {formatNumber(collectionStore.stats.total_artists)}
         </p>
@@ -1158,8 +1158,9 @@
         class="w-full bg-brand-main/40 border border-brand-border rounded-lg"
       >
         <div class="w-full p-3 text-left">
-          <span class="label-heading text-brand-text-secondary">{i18n.t("settings.statsSize")}</span
-          >
+          <span class="label-heading text-brand-text-secondary">
+            {i18n.t("settings.statsSize")}
+          </span>
           <p class="text-base font-bold text-brand-text-primary mt-0.5">{diskSizeLabel}</p>
         </div>
       </HelpTip>

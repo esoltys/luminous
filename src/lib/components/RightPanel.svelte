@@ -270,29 +270,29 @@
           {@const np = playerStore.stationNowPlaying}
           <!-- The track the station announces right now (#2008). -->
           <div data-station-now-playing class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary shrink-0"
-              >{i18n.t("playerBar.onAirLabel", {}, "On air")}</span
-            >
-            <span class="text-brand-text-secondary text-right break-words min-w-0"
-              >{np.artist ? `${np.artist} — ${np.title}` : np.title}</span
-            >
+            <span class="text-brand-text-secondary shrink-0">
+              {i18n.t("playerBar.onAirLabel", {}, "On air")}
+            </span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">
+              {np.artist ? `${np.artist} — ${np.title}` : np.title}
+            </span>
           </div>
         {/if}
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary shrink-0"
-              >{i18n.t("playerBar.releasedLabel", {}, "Released")}</span
-            >
-            <span class="text-brand-text-secondary text-right break-words min-w-0"
-              >{currentSong.year}</span
-            >
+            <span class="text-brand-text-secondary shrink-0">
+              {i18n.t("playerBar.releasedLabel", {}, "Released")}
+            </span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">
+              {currentSong.year}
+            </span>
           </div>
         {/if}
         {#if currentSong.genre}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary shrink-0"
-              >{i18n.t("playerBar.genreLabel", {}, "Genre")}</span
-            >
+            <span class="text-brand-text-secondary shrink-0">
+              {i18n.t("playerBar.genreLabel", {}, "Genre")}
+            </span>
             <div class="min-w-0 flex justify-end">
               <GenreChips genre={currentSong.genre} variant="full" />
             </div>
@@ -300,12 +300,12 @@
         {/if}
         {#if currentSong.composer}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary shrink-0"
-              >{i18n.t("playerBar.composerLabel", {}, "Composer")}</span
-            >
-            <span class="text-brand-text-secondary text-right break-words min-w-0"
-              >{currentSong.composer}</span
-            >
+            <span class="text-brand-text-secondary shrink-0">
+              {i18n.t("playerBar.composerLabel", {}, "Composer")}
+            </span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">
+              {currentSong.composer}
+            </span>
           </div>
         {/if}
       </div>
@@ -342,12 +342,12 @@
           {/if}
           {#if currentSong.dynamic_range != null}
             <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary shrink-0"
-                >{i18n.t("playerBar.dynamicRangeLabel", {}, "Dynamic Range")}</span
-              >
-              <span class="text-brand-text-primary text-right break-words min-w-0"
-                >{dynamicRangeText}</span
-              >
+              <span class="text-brand-text-secondary shrink-0">
+                {i18n.t("playerBar.dynamicRangeLabel", {}, "Dynamic Range")}
+              </span>
+              <span class="text-brand-text-primary text-right break-words min-w-0">
+                {dynamicRangeText}
+              </span>
             </div>
           {/if}
 
@@ -361,9 +361,9 @@
 
               {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
                 <div class="space-y-1.5">
-                  <span class="text-brand-text-secondary"
-                    >{i18n.t("playerBar.mbTagsSectionLabel", {}, "Community Tags")}:</span
-                  >
+                  <span class="text-brand-text-secondary">
+                    {i18n.t("playerBar.mbTagsSectionLabel", {}, "Community Tags")}:
+                  </span>
                   <div class="flex flex-wrap gap-x-1.5 gap-y-1 leading-relaxed">
                     {#each contextData.mb_tags as tag (tag)}
                       <span class="px-2 py-0.5 rounded-full chip-neutral text-[11px]">{tag}</span>
@@ -374,18 +374,18 @@
 
               {#if contextData?.mb_rating != null}
                 <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary shrink-0"
-                    >{i18n.t("playerBar.mbRatingLabel", {}, "Community Rating")}</span
-                  >
+                  <span class="text-brand-text-secondary shrink-0">
+                    {i18n.t("playerBar.mbRatingLabel", {}, "Community Rating")}
+                  </span>
                   <span class="text-brand-text-primary text-right">
                     {formatNumber(contextData.mb_rating, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })} / 5
                     {#if contextData.mb_rating_votes}
-                      <span class="text-brand-text-secondary"
-                        >{i18n.plural("playerBar.mbRatingVotes", contextData.mb_rating_votes)}</span
-                      >
+                      <span class="text-brand-text-secondary">
+                        {i18n.plural("playerBar.mbRatingVotes", contextData.mb_rating_votes)}
+                      </span>
                     {/if}
                   </span>
                 </div>
@@ -402,8 +402,9 @@
                   >
                     <span
                       class="text-brand-text-primary underline decoration-brand-text-secondary/40 break-words transition-colors"
-                      >{row.name || row.id}</span
                     >
+                      {row.name || row.id}
+                    </span>
                     <ExternalLink
                       class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
                     />
@@ -413,9 +414,9 @@
               {#each musicbrainzMetaRows as row (row.label)}
                 <div class="flex items-start justify-between gap-3">
                   <span class="text-brand-text-secondary shrink-0">{row.label}</span>
-                  <span class="text-brand-text-primary text-right break-words min-w-0"
-                    >{row.value}</span
-                  >
+                  <span class="text-brand-text-primary text-right break-words min-w-0">
+                    {row.value}
+                  </span>
                 </div>
               {/each}
             </div>

@@ -404,9 +404,9 @@
 
                   <div class="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block"
-                        >{i18n.t("curation.qualityLabel")}</span
-                      >
+                      <span class="text-[10px] text-brand-text-secondary block">
+                        {i18n.t("curation.qualityLabel")}
+                      </span>
                       <span class="font-medium text-brand-text-primary">
                         {#if candidate.song.bitdepth && candidate.song.samplerate}
                           {formatBitDepth(candidate.song.bitdepth)} / {formatSampleRate(
@@ -421,9 +421,9 @@
                     </div>
 
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block"
-                        >{i18n.t("curation.sizeDurationLabel")}</span
-                      >
+                      <span class="text-[10px] text-brand-text-secondary block">
+                        {i18n.t("curation.sizeDurationLabel")}
+                      </span>
                       <span class="font-medium text-brand-text-primary">
                         {formatFileSize(candidate.song.filesize)} • {formatDuration(
                           candidate.song.length_nanosec,
@@ -492,27 +492,27 @@
 
                   <div class="grid grid-cols-3 gap-2 text-xs">
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block"
-                        >{i18n.t("curation.playCountLabel")}</span
-                      >
+                      <span class="text-[10px] text-brand-text-secondary block">
+                        {i18n.t("curation.playCountLabel")}
+                      </span>
                       <span class="font-medium text-brand-text-primary tabular-nums">
                         {candidate.song.playcount || 0}
                       </span>
                     </div>
 
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block"
-                        >{i18n.t("curation.ratingLabel")}</span
-                      >
+                      <span class="text-[10px] text-brand-text-secondary block">
+                        {i18n.t("curation.ratingLabel")}
+                      </span>
                       <span class="font-medium text-brand-text-primary flex items-center gap-0.5">
                         {#if candidate.song.rating && candidate.song.rating > 0}
                           <Star class="w-3 h-3 text-brand-accent-text fill-brand-accent-text" />
-                          <span
-                            >{formatNumber(candidate.song.rating * 5, {
+                          <span>
+                            {formatNumber(candidate.song.rating * 5, {
                               minimumFractionDigits: 1,
                               maximumFractionDigits: 1,
-                            })}</span
-                          >
+                            })}
+                          </span>
                         {:else}
                           <span class="text-brand-text-secondary">—</span>
                         {/if}
@@ -520,9 +520,9 @@
                     </div>
 
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block"
-                        >{i18n.t("curation.playlistCountLabel")}</span
-                      >
+                      <span class="text-[10px] text-brand-text-secondary block">
+                        {i18n.t("curation.playlistCountLabel")}
+                      </span>
                       <span class="font-medium text-brand-text-primary tabular-nums">
                         {candidate.playlist_count}
                       </span>
@@ -532,18 +532,18 @@
                   <div
                     class="flex items-center justify-between text-xs pt-1 border-t border-brand-border/20"
                   >
-                    <span class="text-[10px] text-brand-text-secondary"
-                      >{i18n.t("curation.dateAddedLabel")}</span
-                    >
+                    <span class="text-[10px] text-brand-text-secondary">
+                      {i18n.t("curation.dateAddedLabel")}
+                    </span>
                     <span class="text-[11px] text-brand-text-secondary tabular-nums">
                       {formatDate(candidate.song.added)}
                     </span>
                   </div>
 
                   <div class="pt-1">
-                    <span class="text-[10px] text-brand-text-secondary block mb-1"
-                      >{i18n.t("curation.tagsLabel")}</span
-                    >
+                    <span class="text-[10px] text-brand-text-secondary block mb-1">
+                      {i18n.t("curation.tagsLabel")}
+                    </span>
                     {#if candidate.tags && candidate.tags.length > 0}
                       <div class="flex items-center gap-1 flex-wrap">
                         {#each candidate.tags as tag}

@@ -476,9 +476,9 @@
               ? 'border-brand-accent shadow-md shadow-brand-accent/5'
               : 'border-brand-border/60 hover:border-brand-accent/40'}"
           >
-            <span class="font-semibold text-sm text-brand-text-primary"
-              >{i18n.t(policy.labelKey)}</span
-            >
+            <span class="font-semibold text-sm text-brand-text-primary">
+              {i18n.t(policy.labelKey)}
+            </span>
             <span class="text-xs text-brand-text-secondary leading-relaxed">
               {isDisabled
                 ? i18n.t(

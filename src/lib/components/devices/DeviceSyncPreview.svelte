@@ -287,9 +287,9 @@
         height="h-10"
         label={i18n.t("devices.now")}
       />
-      <span class="text-xs font-semibold text-brand-text-secondary"
-        >{i18n.t("devices.afterSync")}</span
-      >
+      <span class="text-xs font-semibold text-brand-text-secondary">
+        {i18n.t("devices.afterSync")}
+      </span>
       <DeviceStorageBar
         slices={afterSlices}
         capacityBytes={storage.capacityBytes}
@@ -302,8 +302,10 @@
       <div class="relative h-4 text-[11px] font-semibold text-brand-text-primary">
         <span
           class="absolute top-0 -translate-x-full whitespace-nowrap"
-          style:left="{(storage.capacityBytes / Math.max(1, scale)) * 100}%">{storageLabel}</span
+          style:left="{(storage.capacityBytes / Math.max(1, scale)) * 100}%"
         >
+          {storageLabel}
+        </span>
       </div>
       <span></span>
       <DeviceStorageLegend items={legend} />
@@ -321,9 +323,9 @@
                   class="flex items-baseline justify-between gap-3 py-1.5 border-b border-brand-border/30 text-sm"
                 >
                   <span class="truncate text-brand-text-primary">{itemLabel(item)}</span>
-                  <span class="shrink-0 text-xs text-brand-text-secondary"
-                    >{reason(item.reason)}</span
-                  >
+                  <span class="shrink-0 text-xs text-brand-text-secondary">
+                    {reason(item.reason)}
+                  </span>
                 </li>
               {/each}
               {#if key === "update" && playlistFiles > 0}
@@ -331,19 +333,21 @@
                   class="flex items-baseline justify-between gap-3 py-1.5 border-b border-brand-border/30 text-sm"
                 >
                   <span class="text-brand-text-primary">{i18n.t("devices.playlistsRow")}</span>
-                  <span class="shrink-0 text-xs text-brand-text-secondary"
-                    >{i18n.plural("devices.playlistFilesRewritten", playlistFiles, {
+                  <span class="shrink-0 text-xs text-brand-text-secondary">
+                    {i18n.plural("devices.playlistFilesRewritten", playlistFiles, {
                       count: formatNumber(playlistFiles),
-                    })}</span
-                  >
+                    })}
+                  </span>
                 </li>
               {/if}
             </ul>
             {#if !expanded[key] && list.songs > list.items.length}
               <button
                 class="self-start mt-2 text-sm text-brand-accent-text hover:text-brand-accent-text-hover"
-                onclick={() => showAll(key)}>{more}</button
+                onclick={() => showAll(key)}
               >
+                {more}
+              </button>
             {/if}
             {#if key === "update"}
               <p class="mt-2 text-xs text-brand-text-secondary">
@@ -361,14 +365,14 @@
   >
     {#if storage.fits}
       <Button onclick={onback}>{i18n.t("devices.changeSelection")}</Button>
-      <Button variant="primary" onclick={start} disabled={busy}
-        >{i18n.t("devices.startSync")}</Button
-      >
+      <Button variant="primary" onclick={start} disabled={busy}>
+        {i18n.t("devices.startSync")}
+      </Button>
     {:else}
       {#if plan.shortfall?.convertAllSavingBytes && target}
-        <Button onclick={convertEverything} disabled={busy}
-          >{i18n.t("devices.convertEverything", { target })}</Button
-        >
+        <Button onclick={convertEverything} disabled={busy}>
+          {i18n.t("devices.convertEverything", { target })}
+        </Button>
       {/if}
       <Button variant="primary" onclick={onback}>{i18n.t("devices.changeSelection")}</Button>
     {/if}

@@ -212,9 +212,9 @@
       <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between gap-4">
           <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary"
-              >{i18n.t("settings.webdavAutoSyncLabel")}</span
-            >
+            <span class="text-sm font-medium text-brand-text-primary">
+              {i18n.t("settings.webdavAutoSyncLabel")}
+            </span>
             <p class="text-xs text-brand-text-secondary text-pretty">
               {i18n.t("settings.webdavAutoSyncHint")}
             </p>
@@ -270,8 +270,9 @@
               title={i18n.t(choice.label)}
             >
               <Icon class="w-5 h-5" />
-              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span
-              >
+              <span class="text-[10px] font-medium truncate max-w-full">
+                {i18n.t(choice.label)}
+              </span>
             </button>
           {/each}
         </div>

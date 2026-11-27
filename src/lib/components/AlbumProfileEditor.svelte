@@ -323,12 +323,12 @@
         <!-- Location -->
         <div class="flex items-center gap-3">
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="label-field text-brand-text-secondary"
-              >{i18n.t("albumTagEditor.locationField")}</span
-            >
-            <span class="text-xs text-brand-text-secondary break-all select-text"
-              >{albumFolderPath}</span
-            >
+            <span class="label-field text-brand-text-secondary">
+              {i18n.t("albumTagEditor.locationField")}
+            </span>
+            <span class="text-xs text-brand-text-secondary break-all select-text">
+              {albumFolderPath}
+            </span>
           </div>
           {#if !isRemoteSource}
             <Button
@@ -353,9 +353,9 @@
             sizeClass="w-12 h-12 rounded"
           />
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="label-field text-brand-text-secondary"
-              >{i18n.t("albumTagEditor.artworkField")}</span
-            >
+            <span class="label-field text-brand-text-secondary">
+              {i18n.t("albumTagEditor.artworkField")}
+            </span>
             <span class="text-xs text-brand-text-secondary">
               {hasEmbeddedArt
                 ? i18n.t("albumTagEditor.artworkEmbedded")
@@ -505,8 +505,9 @@
               <span>{i18n.t("sortOverrides.heading")}</span>
               <span
                 class="text-[10px] text-brand-text-secondary group-open:rotate-180 transition-transform"
-                >▼</span
               >
+                ▼
+              </span>
             </summary>
             <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
               <FormField label={i18n.t("sortOverrides.album")} for="album-tag-albumsort">

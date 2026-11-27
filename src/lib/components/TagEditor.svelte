@@ -691,9 +691,9 @@
       <div class="flex flex-col gap-4">
         <div class="flex items-center gap-3">
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="label-field text-brand-text-secondary"
-              >{i18n.t("tagEditor.locationField")}</span
-            >
+            <span class="label-field text-brand-text-secondary">
+              {i18n.t("tagEditor.locationField")}
+            </span>
             <span class="text-xs text-brand-text-secondary break-all select-text">{path}</span>
           </div>
           {#if !isRemoteSource}
@@ -732,9 +732,9 @@
             <CoverArt {songId} sizeClass="w-12 h-12 rounded" />
           {/key}
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="label-field text-brand-text-secondary"
-              >{i18n.t("tagEditor.artworkField")}</span
-            >
+            <span class="label-field text-brand-text-secondary">
+              {i18n.t("tagEditor.artworkField")}
+            </span>
             <span class="text-xs text-brand-text-secondary">
               {artEmbedded
                 ? i18n.t("tagEditor.artworkEmbedded")
@@ -983,9 +983,9 @@
               </Button>
             </div>
             {#if bpmDetected}
-              <span class="text-[11px] text-brand-text-secondary"
-                >{i18n.t("tagEditor.detectedValueHint")}</span
-              >
+              <span class="text-[11px] text-brand-text-secondary">
+                {i18n.t("tagEditor.detectedValueHint")}
+              </span>
             {/if}
           </FormField>
 
@@ -1037,8 +1037,9 @@
               <span>{i18n.t("sortOverrides.heading")}</span>
               <span
                 class="text-[10px] text-brand-text-secondary group-open:rotate-180 transition-transform"
-                >▼</span
               >
+                ▼
+              </span>
             </summary>
             <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
               <FormField label={i18n.t("sortOverrides.title")} for="tag-titlesort">
@@ -1123,8 +1124,9 @@
                 </div>
                 <span
                   class="text-[10px] text-brand-text-secondary group-open:rotate-180 transition-transform"
-                  >▼</span
                 >
+                  ▼
+                </span>
               </summary>
               <div class="p-3 pt-2 space-y-3 border-t border-brand-border/60 text-xs">
                 <!-- Source Block -->
@@ -1136,38 +1138,38 @@
                     class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs bg-brand-surface/50 p-2.5 rounded border border-brand-border/40"
                   >
                     <div>
-                      <span class="text-brand-text-secondary"
-                        >{i18n.t("tagEditor.historyImported")}:</span
-                      >
-                      <span class="ml-1 text-brand-text-primary"
-                        >{tagHistory.source.added ? formatDate(tagHistory.source.added) : "—"}</span
-                      >
+                      <span class="text-brand-text-secondary">
+                        {i18n.t("tagEditor.historyImported")}:
+                      </span>
+                      <span class="ml-1 text-brand-text-primary">
+                        {tagHistory.source.added ? formatDate(tagHistory.source.added) : "—"}
+                      </span>
                     </div>
                     {#if tagHistory.source.format}
                       <div>
-                        <span class="text-brand-text-secondary"
-                          >{i18n.t("tagEditor.historyFormat")}:</span
-                        >
+                        <span class="text-brand-text-secondary">
+                          {i18n.t("tagEditor.historyFormat")}:
+                        </span>
                         <span class="ml-1 text-brand-text-primary">{tagHistory.source.format}</span>
                       </div>
                     {/if}
                     <div>
-                      <span class="text-brand-text-secondary"
-                        >{i18n.t("tagEditor.historyFileSize")}:</span
-                      >
-                      <span class="ml-1 text-brand-text-primary"
-                        >{tagHistory.source.filesize != null
+                      <span class="text-brand-text-secondary">
+                        {i18n.t("tagEditor.historyFileSize")}:
+                      </span>
+                      <span class="ml-1 text-brand-text-primary">
+                        {tagHistory.source.filesize != null
                           ? formatFileSize(tagHistory.source.filesize)
-                          : "—"}</span
-                      >
+                          : "—"}
+                      </span>
                     </div>
                     <div class="col-span-2 break-all">
-                      <span class="text-brand-text-secondary"
-                        >{i18n.t("tagEditor.locationField")}:</span
-                      >
-                      <span class="ml-1 text-brand-text-primary font-mono text-[11px]"
-                        >{tagHistory.source.path}</span
-                      >
+                      <span class="text-brand-text-secondary">
+                        {i18n.t("tagEditor.locationField")}:
+                      </span>
+                      <span class="ml-1 text-brand-text-primary font-mono text-[11px]">
+                        {tagHistory.source.path}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1254,22 +1256,23 @@
                                     {i18n.t("tagEditor.historyActorScan")}
                                   </span>
                                 {:else}
-                                  <span class="text-brand-text-secondary font-medium"
-                                    >{i18n.t("tagEditor.historyActorLuminous")}</span
-                                  >
+                                  <span class="text-brand-text-secondary font-medium">
+                                    {i18n.t("tagEditor.historyActorLuminous")}
+                                  </span>
                                 {/if}
                                 {#if entry.batchOtherTracks > 0}
                                   <span class="text-brand-text-secondary">•</span>
-                                  <span
-                                    >{i18n.t("tagEditor.historyBatchNote", {
+                                  <span>
+                                    {i18n.t("tagEditor.historyBatchNote", {
                                       count: entry.batchOtherTracks,
-                                    })}</span
-                                  >
+                                    })}
+                                  </span>
                                 {/if}
                               </div>
                               <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-brand-text-secondary">{formatDate(entry.at)}</span
-                                >
+                                <span class="text-brand-text-secondary">
+                                  {formatDate(entry.at)}
+                                </span>
                                 {#if entry.batchId && entry.batchOtherTracks > 0}
                                   <Button
                                     variant="secondary"
@@ -1288,15 +1291,16 @@
                               <div
                                 class="flex items-center gap-1.5 text-brand-text-primary break-all flex-wrap"
                               >
-                                <span class="font-medium text-brand-text-primary"
-                                  >{getFieldLabel(entry.field)}:</span
-                                >
-                                <span class="text-brand-text-secondary line-through"
-                                  >{formatHistoryValue(entry.oldValue)}</span
-                                >
+                                <span class="font-medium text-brand-text-primary">
+                                  {getFieldLabel(entry.field)}:
+                                </span>
+                                <span class="text-brand-text-secondary line-through">
+                                  {formatHistoryValue(entry.oldValue)}
+                                </span>
                                 <span class="text-brand-text-secondary">→</span>
-                                <span class="font-medium">{formatHistoryValue(entry.newValue)}</span
-                                >
+                                <span class="font-medium">
+                                  {formatHistoryValue(entry.newValue)}
+                                </span>
                               </div>
                               <Button
                                 variant="secondary"

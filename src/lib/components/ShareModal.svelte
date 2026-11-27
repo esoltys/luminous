@@ -831,9 +831,9 @@
 
     <div class="flex flex-col gap-3">
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-semibold text-brand-text-secondary mr-1"
-          >{i18n.t("shareModal.aspectRatioLabel")}</span
-        >
+        <span class="text-xs font-semibold text-brand-text-secondary mr-1">
+          {i18n.t("shareModal.aspectRatioLabel")}
+        </span>
         {#each SHARE_ASPECT_RATIOS as ratio (ratio.id)}
           <button
             onclick={() => (aspectRatio = ratio.id)}
@@ -849,9 +849,9 @@
 
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold text-brand-text-secondary mr-1"
-            >{i18n.t("shareModal.themeLabel")}</span
-          >
+          <span class="text-xs font-semibold text-brand-text-secondary mr-1">
+            {i18n.t("shareModal.themeLabel")}
+          </span>
           <button
             onclick={() => (theme = "dark")}
             title={i18n.t("shareModal.themeDark")}
@@ -876,9 +876,11 @@
 
         {#if showTrackListToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
-              >{i18n.t("shareModal.trackListToggle")}</span
+            <span
+              class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
             >
+              {i18n.t("shareModal.trackListToggle")}
+            </span>
             <Toggle
               checked={includeTrackList}
               onchange={(v) => (includeTrackList = v)}
@@ -889,9 +891,11 @@
         {/if}
         {#if showBarsToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
-              >{i18n.t("shareModal.barsToggle")}</span
+            <span
+              class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
             >
+              {i18n.t("shareModal.barsToggle")}
+            </span>
             <Toggle
               checked={includeBars}
               onchange={(v) => (includeBars = v)}
@@ -902,9 +906,11 @@
         {/if}
         {#if showLogoToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
-              >{i18n.t("shareModal.logoToggle")}</span
+            <span
+              class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
             >
+              {i18n.t("shareModal.logoToggle")}
+            </span>
             <Toggle
               checked={useLogo}
               onchange={(v) => (useLogo = v)}
@@ -915,9 +921,11 @@
         {/if}
         {#if showLibraryToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
-              >{i18n.t("shareModal.libraryToggle")}</span
+            <span
+              class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
             >
+              {i18n.t("shareModal.libraryToggle")}
+            </span>
             <Toggle
               checked={includeLibraryInfo}
               onchange={(v) => (includeLibraryInfo = v)}

@@ -62,9 +62,9 @@
   {#if formattedBeginDate}
     <div class="flex items-start justify-between gap-3">
       <span class="text-brand-text-secondary shrink-0">{dateLabel}</span>
-      <span class="text-brand-text-primary text-right break-words min-w-0"
-        >{formattedBeginDate}</span
-      >
+      <span class="text-brand-text-primary text-right break-words min-w-0">
+        {formattedBeginDate}
+      </span>
     </div>
   {/if}
   {#if formattedEndDate}

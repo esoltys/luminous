@@ -186,13 +186,9 @@
   {#if isWindows}
     <div class="flex items-center justify-between gap-4 py-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t(
-            "settings.defaultPlayerLabel",
-            {},
-            "Make Luminous the default music player",
-          )}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.defaultPlayerLabel", {}, "Make Luminous the default music player")}
+        </span>
         <p class="text-xs text-brand-text-secondary">
           {i18n.t(
             "settings.defaultPlayerHint",
@@ -209,9 +205,9 @@
 
   <div class="flex items-center justify-between gap-4 py-4">
     <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary"
-        >{i18n.t("settings.minimizeToTrayLabel")}</span
-      >
+      <span class="text-sm font-medium text-brand-text-primary">
+        {i18n.t("settings.minimizeToTrayLabel")}
+      </span>
       <p class="text-xs text-brand-text-secondary">{i18n.t("settings.minimizeToTrayHint")}</p>
     </div>
     <Toggle
@@ -223,9 +219,9 @@
 
   <div class="flex items-center justify-between gap-4 py-4">
     <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary"
-        >{i18n.t("settings.launchAtLoginLabel")}</span
-      >
+      <span class="text-sm font-medium text-brand-text-primary">
+        {i18n.t("settings.launchAtLoginLabel")}
+      </span>
       <p class="text-xs text-brand-text-secondary">{i18n.t("settings.launchAtLoginHint")}</p>
     </div>
     <Toggle
@@ -237,9 +233,9 @@
 
   <div class="flex items-center justify-between gap-4 py-4">
     <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary"
-        >{i18n.t("settings.exportDiagnosticsLabel", {}, "Export Diagnostics")}</span
-      >
+      <span class="text-sm font-medium text-brand-text-primary">
+        {i18n.t("settings.exportDiagnosticsLabel", {}, "Export Diagnostics")}
+      </span>
       <p class="text-xs text-brand-text-secondary">
         {i18n.t(
           "settings.exportDiagnosticsHint",
@@ -260,9 +256,9 @@
   {#if dataDirectory}
     <div class="flex flex-col gap-1 py-4 border-t border-brand-border/40">
       <div class="flex items-center gap-2">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.dataStorageLabel", {}, "Data Storage Location")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.dataStorageLabel", {}, "Data Storage Location")}
+        </span>
         <span
           class="px-2 py-0.5 text-[10px] font-bold rounded-full {dataDirectory.is_portable
             ? 'bg-brand-accent/20 text-brand-accent-text border border-brand-accent/40'
@@ -329,9 +325,9 @@
     <!-- Output Backend: shared, or the platform's bit-perfect modes -->
     <div class="flex items-center justify-between gap-4 py-2">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <label for="audio-backend-select" class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.audioBackendLabel")}</label
-        >
+        <label for="audio-backend-select" class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.audioBackendLabel")}
+        </label>
         <p class="text-xs text-brand-text-secondary">{i18n.t("settings.audioBackendHint")}</p>
       </div>
       <Select
@@ -350,9 +346,9 @@
   <!-- Device Selection -->
   <div class="flex items-center justify-between gap-4 py-2">
     <div class="flex flex-col gap-0.5 min-w-0">
-      <label for="audio-device-select" class="text-sm font-medium text-brand-text-primary"
-        >{i18n.t("settings.audioDeviceLabel")}</label
-      >
+      <label for="audio-device-select" class="text-sm font-medium text-brand-text-primary">
+        {i18n.t("settings.audioDeviceLabel")}
+      </label>
       <p class="text-xs text-brand-text-secondary">{i18n.t("settings.audioDeviceHint")}</p>
     </div>
     {#if currentBackendDevices.length === 0 && noDevicesMessageKey}
@@ -404,9 +400,9 @@
   {#if volumeSafety}
     <div class="flex items-center justify-between gap-4 py-2">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.volumeSafetyLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.volumeSafetyLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary">{i18n.t("settings.volumeSafetyHint")}</p>
       </div>
       <Toggle
@@ -418,9 +414,9 @@
     {#if volumeSafety.enabled}
       <div class="flex items-center justify-between gap-4 py-2">
         <div class="flex flex-col gap-0.5 min-w-0">
-          <label for="volume-safety-ceiling" class="text-sm font-medium text-brand-text-primary"
-            >{i18n.t("settings.volumeSafetyCeilingLabel")}</label
-          >
+          <label for="volume-safety-ceiling" class="text-sm font-medium text-brand-text-primary">
+            {i18n.t("settings.volumeSafetyCeilingLabel")}
+          </label>
           <p class="text-xs text-brand-text-secondary">
             {i18n.t("settings.volumeSafetyCeilingHint")}
           </p>
@@ -437,9 +433,9 @@
             onchange={commitCeiling}
             class="w-32 accent-brand-accent"
           />
-          <span class="w-10 text-right text-xs font-medium tabular-nums text-brand-text-primary"
-            >{Math.round(ceilingShown * 100)}%</span
-          >
+          <span class="w-10 text-right text-xs font-medium tabular-nums text-brand-text-primary">
+            {Math.round(ceilingShown * 100)}%
+          </span>
         </div>
       </div>
     {/if}
@@ -449,9 +445,9 @@
   {#if prefs.audioOutputConfig.backend === "asio" && currentBackendDevices.length > 0}
     <div class="flex items-center justify-between gap-4 pt-2 border-t border-brand-border/40">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.audioAsioControlPanelBtn")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("settings.audioAsioControlPanelBtn")}
+        </span>
         <p class="text-xs text-brand-text-secondary">
           {i18n.t("settings.audioAsioControlPanelHint")}
         </p>

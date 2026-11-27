@@ -73,22 +73,22 @@
   >
     <div class="flex items-center justify-between gap-3">
       <p class="min-w-0 truncate text-sm">
-        <span class="font-semibold text-brand-text-primary"
-          >{i18n.t("devices.syncingTo", { storage: name })}</span
-        >
+        <span class="font-semibold text-brand-text-primary">
+          {i18n.t("devices.syncingTo", { storage: name })}
+        </span>
         {#if progress}
-          <span class="ml-2 text-brand-text-secondary"
-            >{i18n.t("devices.songsOf", {
+          <span class="ml-2 text-brand-text-secondary">
+            {i18n.t("devices.songsOf", {
               done: formatNumber(progress.songsDone),
               total: formatNumber(progress.songsTotal),
-            })}</span
-          >
+            })}
+          </span>
         {/if}
       </p>
       <div class="flex items-center gap-1 shrink-0">
-        <Button size="sm" onclick={() => devicesStore.stopSync(device.id)}
-          >{i18n.t("devices.stopSync")}</Button
-        >
+        <Button size="sm" onclick={() => devicesStore.stopSync(device.id)}>
+          {i18n.t("devices.stopSync")}
+        </Button>
         <button
           class="w-8 h-8 flex items-center justify-center rounded-full text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
           onclick={() => (devicesStore.drawerHidden = true)}
@@ -111,16 +111,16 @@
       <span class="min-w-0 truncate text-brand-text-secondary">{step}</span>
       {#if progress}
         <span class="flex items-center gap-4 shrink-0 tabular-nums text-brand-text-secondary">
-          <span
-            >{i18n.t("devices.bytesOf", {
+          <span>
+            {i18n.t("devices.bytesOf", {
               done: formatStorageSize(progress.bytesDone),
               total: formatStorageSize(progress.bytesTotal),
-            })}</span
-          >
+            })}
+          </span>
           {#if progress.bytesPerSec}
-            <span
-              >{formatNumber(progress.bytesPerSec / STORAGE_MB, { maximumFractionDigits: 0 })} MB/s</span
-            >
+            <span>
+              {formatNumber(progress.bytesPerSec / STORAGE_MB, { maximumFractionDigits: 0 })} MB/s
+            </span>
           {/if}
           {#if timeLeft}<span class="font-semibold text-brand-text-primary">{timeLeft}</span>{/if}
         </span>

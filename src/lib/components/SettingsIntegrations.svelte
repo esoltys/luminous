@@ -192,8 +192,10 @@
           <p class="text-xs text-brand-text-secondary leading-relaxed">
             <button
               onclick={() => openExternalUrl("https://listenbrainz.org")}
-              class="text-brand-accent hover:underline">ListenBrainz</button
+              class="text-brand-accent hover:underline"
             >
+              ListenBrainz
+            </button>
             {i18n.t("listenbrainz.integrationDesc")}
           </p>
         </div>
@@ -284,9 +286,9 @@
         class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60"
       >
         <div class="flex flex-col gap-0.5 min-w-0">
-          <span class="text-sm font-medium text-brand-text-primary"
-            >{i18n.t("listenbrainz.enableLabel")}</span
-          >
+          <span class="text-sm font-medium text-brand-text-primary">
+            {i18n.t("listenbrainz.enableLabel")}
+          </span>
           <p class="text-xs text-brand-text-secondary">{i18n.t("listenbrainz.enableHint")}</p>
         </div>
         <Toggle
@@ -309,9 +311,9 @@
                   : i18n.plural("listenbrainz.cachePending", scrobblerStore.pendingCount)}
               </span>
               {#if scrobblerStore.flushSuccessMessage}
-                <span class="text-xs text-brand-text-primary font-medium"
-                  >({scrobblerStore.flushSuccessMessage})</span
-                >
+                <span class="text-xs text-brand-text-primary font-medium">
+                  ({scrobblerStore.flushSuccessMessage})
+                </span>
               {/if}
             </div>
             {#if scrobblerStore.lastError}
@@ -339,9 +341,9 @@
         <div class="space-y-3 pt-3 border-t border-brand-border/60">
           <div class="flex items-center justify-between gap-4 py-1">
             <div class="flex flex-col gap-0.5 min-w-0">
-              <span class="text-sm font-medium text-brand-text-primary"
-                >{i18n.t("listenbrainz.ratingsLabel")}</span
-              >
+              <span class="text-sm font-medium text-brand-text-primary">
+                {i18n.t("listenbrainz.ratingsLabel")}
+              </span>
               <p class="text-xs text-brand-text-secondary">{i18n.t("listenbrainz.ratingsHint")}</p>
             </div>
             <Toggle
@@ -357,8 +359,9 @@
                 <label
                   for="critiquebrainz-user-input"
                   class="text-xs font-semibold text-brand-text-primary"
-                  >{i18n.t("listenbrainz.critiquebrainzUserLabel")}</label
                 >
+                  {i18n.t("listenbrainz.critiquebrainzUserLabel")}
+                </label>
                 <p class="text-[11px] text-brand-text-secondary">
                   {i18n.t("listenbrainz.critiquebrainzUserHint")}
                 </p>
@@ -373,9 +376,9 @@
               </div>
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-col gap-0.5 min-w-0">
-                  <span class="text-xs font-semibold text-brand-text-primary"
-                    >{i18n.t("listenbrainz.syncRatingsLabel")}</span
-                  >
+                  <span class="text-xs font-semibold text-brand-text-primary">
+                    {i18n.t("listenbrainz.syncRatingsLabel")}
+                  </span>
                   <p class="text-[11px] text-brand-text-secondary">
                     {i18n.t("listenbrainz.syncRatingsHint")}
                   </p>
@@ -443,8 +446,10 @@
           <p class="text-xs text-brand-text-secondary leading-relaxed">
             <button
               onclick={() => openExternalUrl("https://www.last.fm")}
-              class="text-brand-accent hover:underline">Last.fm</button
+              class="text-brand-accent hover:underline"
             >
+              Last.fm
+            </button>
             {i18n.t("lastfm.integrationDesc")}
           </p>
         </div>
@@ -500,13 +505,15 @@
           <button
             type="button"
             onclick={() => openExternalUrl("https://www.last.fm/api/account/create")}
-            class="text-brand-accent hover:underline">{i18n.t("lastfm.createKeyLink")}</button
+            class="text-brand-accent hover:underline"
           >
+            {i18n.t("lastfm.createKeyLink")}
+          </button>
         </p>
         <div class="flex flex-col gap-1">
-          <label for="lastfm-api-key-input" class="text-xs font-semibold text-brand-text-primary"
-            >{i18n.t("lastfm.apiKeyLabel")}</label
-          >
+          <label for="lastfm-api-key-input" class="text-xs font-semibold text-brand-text-primary">
+            {i18n.t("lastfm.apiKeyLabel")}
+          </label>
           <Input
             id="lastfm-api-key-input"
             bind:value={lastfmKeyInput}
@@ -515,9 +522,12 @@
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label for="lastfm-api-secret-input" class="text-xs font-semibold text-brand-text-primary"
-            >{i18n.t("lastfm.apiSecretLabel")}</label
+          <label
+            for="lastfm-api-secret-input"
+            class="text-xs font-semibold text-brand-text-primary"
           >
+            {i18n.t("lastfm.apiSecretLabel")}
+          </label>
           <div class="relative max-w-md">
             <Input
               id="lastfm-api-secret-input"
@@ -562,9 +572,9 @@
           class="p-4 rounded-lg bg-brand-surface/60 border border-brand-border/80 space-y-3 pt-2 border-t border-brand-border/60"
         >
           <div class="flex flex-col gap-1">
-            <span class="text-sm font-medium text-brand-text-primary"
-              >{i18n.t("lastfm.authPendingTitle")}</span
-            >
+            <span class="text-sm font-medium text-brand-text-primary">
+              {i18n.t("lastfm.authPendingTitle")}
+            </span>
             <p class="text-xs text-brand-text-secondary">{i18n.t("lastfm.authPendingDesc")}</p>
           </div>
           <div class="flex items-center gap-2">
@@ -602,9 +612,9 @@
         class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60"
       >
         <div class="flex flex-col gap-0.5 min-w-0">
-          <span class="text-sm font-medium text-brand-text-primary"
-            >{i18n.t("lastfm.enableLabel")}</span
-          >
+          <span class="text-sm font-medium text-brand-text-primary">
+            {i18n.t("lastfm.enableLabel")}
+          </span>
           <p class="text-xs text-brand-text-secondary">{i18n.t("lastfm.enableHint")}</p>
         </div>
         <Toggle
@@ -627,9 +637,9 @@
                   : i18n.plural("lastfm.cachePending", scrobblerStore.lastfmPendingCount)}
               </span>
               {#if scrobblerStore.flushSuccessMessage}
-                <span class="text-xs text-brand-text-primary font-medium"
-                  >({scrobblerStore.flushSuccessMessage})</span
-                >
+                <span class="text-xs text-brand-text-primary font-medium">
+                  ({scrobblerStore.flushSuccessMessage})
+                </span>
               {/if}
             </div>
             {#if scrobblerStore.lastError}
@@ -655,9 +665,9 @@
         <div class="space-y-3 pt-3 border-t border-brand-border/60">
           <div class="flex items-center justify-between gap-4 py-1">
             <div class="flex flex-col gap-0.5 min-w-0">
-              <span class="text-sm font-medium text-brand-text-primary"
-                >{i18n.t("lastfm.lovedTracksLabel")}</span
-              >
+              <span class="text-sm font-medium text-brand-text-primary">
+                {i18n.t("lastfm.lovedTracksLabel")}
+              </span>
               <p class="text-xs text-brand-text-secondary">{i18n.t("lastfm.lovedTracksHint")}</p>
             </div>
             <Toggle
@@ -672,9 +682,9 @@
               class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-wrap items-center justify-between gap-3 py-1"
             >
               <div class="flex flex-col gap-0.5 min-w-0">
-                <span class="text-xs font-semibold text-brand-text-primary"
-                  >{i18n.t("lastfm.syncLovedBtn")}</span
-                >
+                <span class="text-xs font-semibold text-brand-text-primary">
+                  {i18n.t("lastfm.syncLovedBtn")}
+                </span>
                 <p class="text-[11px] text-brand-text-secondary">
                   {i18n.t("lastfm.lovedTracksHint")}
                 </p>
@@ -731,8 +741,10 @@
           <p class="text-xs text-brand-text-secondary leading-relaxed">
             <button
               onclick={() => openExternalUrl("https://musicbrainz.org")}
-              class="text-brand-accent hover:underline">MusicBrainz</button
+              class="text-brand-accent hover:underline"
             >
+              MusicBrainz
+            </button>
             {i18n.t("musicbrainz.integrationDesc")}
           </p>
         </div>
@@ -785,8 +797,10 @@
           <p class="text-xs text-brand-text-secondary leading-relaxed">
             {i18n.t("settings.fanartDesc1")}<button
               onclick={() => openExternalUrl("https://fanart.tv")}
-              class="text-brand-accent hover:underline">fanart.tv</button
-            >{i18n.t("settings.fanartDesc2")}
+              class="text-brand-accent hover:underline"
+            >
+              fanart.tv
+            </button>{i18n.t("settings.fanartDesc2")}
           </p>
         </div>
       </div>
@@ -955,9 +969,9 @@
 
     <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("discord.enableLabel")}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">
+          {i18n.t("discord.enableLabel")}
+        </span>
         <p class="text-xs text-brand-text-secondary">{i18n.t("discord.enableHint")}</p>
       </div>
       <Toggle
@@ -971,9 +985,9 @@
       <div class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-col gap-3 py-1">
         <div class="flex items-center justify-between gap-4 py-1">
           <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary"
-              >{i18n.t("discord.showAlbumLabel")}</span
-            >
+            <span class="text-sm font-medium text-brand-text-primary">
+              {i18n.t("discord.showAlbumLabel")}
+            </span>
             <p class="text-xs text-brand-text-secondary">{i18n.t("discord.showAlbumHint")}</p>
           </div>
           <Toggle
@@ -985,9 +999,9 @@
 
         <div class="flex items-center justify-between gap-4 py-1">
           <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary"
-              >{i18n.t("discord.showTimeLabel")}</span
-            >
+            <span class="text-sm font-medium text-brand-text-primary">
+              {i18n.t("discord.showTimeLabel")}
+            </span>
             <p class="text-xs text-brand-text-secondary">{i18n.t("discord.showTimeHint")}</p>
           </div>
           <Toggle
@@ -1013,8 +1027,10 @@
         <p class="text-xs text-brand-text-secondary leading-relaxed">
           <button
             onclick={() => openExternalUrl("https://picard.musicbrainz.org")}
-            class="text-brand-accent hover:underline">MusicBrainz Picard</button
+            class="text-brand-accent hover:underline"
           >
+            MusicBrainz Picard
+          </button>
           {i18n.t("picard.integrationDesc")}
         </p>
       </div>
@@ -1023,9 +1039,9 @@
 
   <div class="flex items-center justify-between gap-4 py-1">
     <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary"
-        >{i18n.t("picard.missingPlaylistLabel")}</span
-      >
+      <span class="text-sm font-medium text-brand-text-primary">
+        {i18n.t("picard.missingPlaylistLabel")}
+      </span>
       <p class="text-xs text-brand-text-secondary">{i18n.t("picard.missingPlaylistHint")}</p>
     </div>
     <Toggle

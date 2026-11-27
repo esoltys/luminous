@@ -26,8 +26,10 @@
         <h3 class="text-2xl font-bold text-brand-text-primary">
           {i18n.t("settings.aboutAppName", {}, "Luminous Music Player")}<sup
             class="text-xs font-normal text-brand-text-secondary ml-0.5"
-            aria-label="trademark">™</sup
+            aria-label="trademark"
           >
+            ™
+          </sup>
         </h3>
       </div>
       <p class="text-sm text-brand-text-secondary">{i18n.t("settings.aboutTagline")}</p>

@@ -213,23 +213,29 @@
           >
             <button
               class="hover:text-brand-text-primary truncate"
-              onclick={() => navigationStore.viewFiles()}>{i18n.t("sidebar.files")}</button
+              onclick={() => navigationStore.viewFiles()}
             >
+              {i18n.t("sidebar.files")}
+            </button>
             <span aria-hidden="true">/</span>
             <button
               class="truncate {location.path.length === 0
                 ? 'text-brand-text-primary font-semibold'
                 : 'hover:text-brand-text-primary'}"
-              onclick={() => navigate([])}>{sourceName}</button
+              onclick={() => navigate([])}
             >
+              {sourceName}
+            </button>
             {#each location.path as _, i (i)}
               <span aria-hidden="true">/</span>
               <button
                 class="truncate {i === location.path.length - 1
                   ? 'text-brand-text-primary font-semibold'
                   : 'hover:text-brand-text-primary'}"
-                onclick={() => navigate(location.path.slice(0, i + 1))}>{pathName(i)}</button
+                onclick={() => navigate(location.path.slice(0, i + 1))}
               >
+                {pathName(i)}
+              </button>
             {/each}
           </nav>
           <h1
@@ -295,17 +301,18 @@
                   <span class="truncate" title={line}>
                     {line}
                     {#if i === 1 && collectionStore.isScanning}
-                      <span class="text-brand-accent font-medium ml-1.5"
-                        >· {i18n.t("files.scanning")}</span
-                      >
+                      <span class="text-brand-accent font-medium ml-1.5">
+                        · {i18n.t("files.scanning")}
+                      </span>
                     {:else if i === 1 && isLocal && !listing.excluded && unscannedCount > 0}
                       <span class="ml-1.5">
                         · {i18n.plural("files.summaryUnscanned", unscannedCount)}
                         <button
                           class="text-brand-accent hover:underline font-medium ml-1 cursor-pointer"
                           onclick={() => scanFolder(location.source, location.path)}
-                          >{i18n.t("files.scanNudge")}</button
                         >
+                          {i18n.t("files.scanNudge")}
+                        </button>
                       </span>
                     {/if}
                   </span>

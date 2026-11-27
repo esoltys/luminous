@@ -290,21 +290,21 @@
               ></div>
             </div>
             {#if theme.id === "dynamic-artwork"}
-              <span class="text-xs text-brand-text-secondary leading-relaxed"
-                >{i18n.t(
+              <span class="text-xs text-brand-text-secondary leading-relaxed">
+                {i18n.t(
                   "settings.luminousFootnote",
                   {},
                   "Colors shift to match whatever album art is playing now",
-                )}</span
-              >
+                )}
+              </span>
             {:else if theme.id === "system"}
-              <span class="text-xs text-brand-text-secondary leading-relaxed"
-                >{i18n.t(
+              <span class="text-xs text-brand-text-secondary leading-relaxed">
+                {i18n.t(
                   "settings.systemFootnote",
                   {},
                   "Switches between light and dark to match your OS",
-                )}</span
-              >
+                )}
+              </span>
             {/if}
           </div>
         {/each}
@@ -399,9 +399,9 @@
                 : 'border-brand-border/60 hover:border-brand-border'}"
             >
               <div class="flex items-center justify-between w-full">
-                <span class="font-semibold text-sm text-brand-text-primary truncate"
-                  >{theme.name}</span
-                >
+                <span class="font-semibold text-sm text-brand-text-primary truncate">
+                  {theme.name}
+                </span>
               </div>
               <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
               <div
@@ -515,9 +515,9 @@
     <div class="space-y-5">
       <div class="flex flex-col @xl:flex-row gap-4 @xl:items-end justify-between">
         <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
-          <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold"
-            >{i18n.t("settings.themeNameLabel")}</label
-          >
+          <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">
+            {i18n.t("settings.themeNameLabel")}
+          </label>
           <Input
             id="theme-name-input"
             type="text"
@@ -552,12 +552,12 @@
             />
           </div>
           <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-brand-text-primary leading-snug"
-              >{i18n.t("settings.mainViewLabel")}</span
-            >
-            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight"
-              >{i18n.t("settings.mainViewDescription")}</span
-            >
+            <span class="text-xs font-semibold text-brand-text-primary leading-snug">
+              {i18n.t("settings.mainViewLabel")}
+            </span>
+            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">
+              {i18n.t("settings.mainViewDescription")}
+            </span>
           </div>
         </div>
 
@@ -579,12 +579,12 @@
             />
           </div>
           <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-brand-text-primary leading-snug"
-              >{i18n.t("settings.sidebarLabel")}</span
-            >
-            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight"
-              >{i18n.t("settings.sidebarDescription")}</span
-            >
+            <span class="text-xs font-semibold text-brand-text-primary leading-snug">
+              {i18n.t("settings.sidebarLabel")}
+            </span>
+            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">
+              {i18n.t("settings.sidebarDescription")}
+            </span>
           </div>
         </div>
 
@@ -606,12 +606,12 @@
             />
           </div>
           <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-brand-text-primary leading-snug"
-              >{i18n.t("settings.playerBarLabel")}</span
-            >
-            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight"
-              >{i18n.t("settings.playerBarDescription")}</span
-            >
+            <span class="text-xs font-semibold text-brand-text-primary leading-snug">
+              {i18n.t("settings.playerBarLabel")}
+            </span>
+            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">
+              {i18n.t("settings.playerBarDescription")}
+            </span>
           </div>
         </div>
 
@@ -633,12 +633,12 @@
             />
           </div>
           <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-brand-text-primary leading-snug"
-              >{i18n.t("settings.accentLabel")}</span
-            >
-            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight"
-              >{i18n.t("settings.accentDescription")}</span
-            >
+            <span class="text-xs font-semibold text-brand-text-primary leading-snug">
+              {i18n.t("settings.accentLabel")}
+            </span>
+            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">
+              {i18n.t("settings.accentDescription")}
+            </span>
           </div>
         </div>
 
@@ -660,12 +660,12 @@
             />
           </div>
           <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-brand-text-primary leading-snug"
-              >{i18n.t("settings.accentHoverLabel")}</span
-            >
-            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight"
-              >{i18n.t("settings.accentHoverDescription")}</span
-            >
+            <span class="text-xs font-semibold text-brand-text-primary leading-snug">
+              {i18n.t("settings.accentHoverLabel")}
+            </span>
+            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">
+              {i18n.t("settings.accentHoverDescription")}
+            </span>
           </div>
         </div>
 
@@ -687,12 +687,12 @@
             />
           </div>
           <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-brand-text-primary leading-snug"
-              >{i18n.t("settings.bordersLabel")}</span
-            >
-            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight"
-              >{i18n.t("settings.bordersDescription")}</span
-            >
+            <span class="text-xs font-semibold text-brand-text-primary leading-snug">
+              {i18n.t("settings.bordersLabel")}
+            </span>
+            <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">
+              {i18n.t("settings.bordersDescription")}
+            </span>
           </div>
         </div>
       </div>

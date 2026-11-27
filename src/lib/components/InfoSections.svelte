@@ -86,22 +86,22 @@
       <div class="space-y-2 text-xs">
         {#if section.country}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary shrink-0"
-              >{i18n.t("artistInfo.country", {}, "Country")}</span
-            >
-            <span class="text-brand-text-primary text-right break-words min-w-0"
-              >{section.country}</span
-            >
+            <span class="text-brand-text-secondary shrink-0">
+              {i18n.t("artistInfo.country", {}, "Country")}
+            </span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">
+              {section.country}
+            </span>
           </div>
         {/if}
         {#if section.language}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary shrink-0"
-              >{i18n.t("radio.languageFilter", {}, "Language")}</span
-            >
-            <span class="text-brand-text-primary text-right break-words min-w-0 capitalize"
-              >{section.language}</span
-            >
+            <span class="text-brand-text-secondary shrink-0">
+              {i18n.t("radio.languageFilter", {}, "Language")}
+            </span>
+            <span class="text-brand-text-primary text-right break-words min-w-0 capitalize">
+              {section.language}
+            </span>
           </div>
         {/if}
       </div>
@@ -165,9 +165,9 @@
               <SocialIcon platform={item.platform} size={14} />
             </div>
             <div class="flex items-center gap-1 min-w-0 flex-1">
-              <span class="text-xs font-medium text-brand-text-primary truncate transition-colors"
-                >{item.label}</span
-              >
+              <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                {item.label}
+              </span>
               <ExternalLink
                 class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0"
               />
@@ -271,9 +271,9 @@
               class="w-full @sm:flex-1 max-w-xs flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-brand-sidebar/40 hover:bg-brand-sidebar/70 text-brand-text-primary border border-brand-border/60 font-medium text-xs transition-colors cursor-pointer"
             >
               <OpenInPicard class="w-4 h-4 shrink-0" />
-              <span
-                >{i18n.t("playerBar.contextOpenFolderInPicard", {}, "Open folder in Picard")}</span
-              >
+              <span>
+                {i18n.t("playerBar.contextOpenFolderInPicard", {}, "Open folder in Picard")}
+              </span>
             </button>
           {:else if !picardStore.available}
             <button
@@ -317,13 +317,9 @@
           class="inline-flex items-center gap-1.5 text-xs text-brand-accent hover:underline cursor-pointer font-medium text-left"
         >
           <HelpCircle class="w-4 h-4 shrink-0" />
-          <span
-            >{i18n.t(
-              "playerBar.contextLearnEnrichment",
-              {},
-              "Learn how to get metadata & bios",
-            )}</span
-          >
+          <span>
+            {i18n.t("playerBar.contextLearnEnrichment", {}, "Learn how to get metadata & bios")}
+          </span>
         </button>
       </div>
     </div>

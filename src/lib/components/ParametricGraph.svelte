@@ -350,9 +350,9 @@
       aria-hidden="true"
     >
       {#each [ranges.gain_db.max, 0, ranges.gain_db.min] as g}
-        <span class="absolute right-1 -translate-y-1/2" style="top: {yPct(g)}%"
-          >{formatGain(g)}</span
-        >
+        <span class="absolute right-1 -translate-y-1/2" style="top: {yPct(g)}%">
+          {formatGain(g)}
+        </span>
       {/each}
     </div>
   </div>

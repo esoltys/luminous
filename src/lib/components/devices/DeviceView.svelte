@@ -353,8 +353,9 @@
                     role="radio"
                     aria-checked={s.id === storage.id}
                     onclick={() => setStorage(s.id)}
-                    >{storageName(device, s)}, {formatStorageSize(s.totalBytes)}</button
                   >
+                    {storageName(device, s)}, {formatStorageSize(s.totalBytes)}
+                  </button>
                 {/each}
               </div>
             {/if}
@@ -372,8 +373,9 @@
           role="tab"
           aria-selected={tab === t}
           onclick={() => setTab(t)}
-          >{i18n.t(t === "files" ? "devices.tabFiles" : "devices.tabSync")}</button
         >
+          {i18n.t(t === "files" ? "devices.tabFiles" : "devices.tabSync")}
+        </button>
       {/each}
     </div>
 

@@ -611,9 +611,9 @@
                 <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
                 <span class="truncate flex-1">{shownName(entry.name, entry.missingTag)}</span>
                 {#if entry.status === "excluded" || entry.status === "notFromLuminous"}
-                  <span class="text-[11px] text-brand-text-secondary shrink-0"
-                    >{statusLabel(entry)}</span
-                  >
+                  <span class="text-[11px] text-brand-text-secondary shrink-0">
+                    {statusLabel(entry)}
+                  </span>
                 {:else}
                   <CaretRightIcon class="w-3 h-3 shrink-0 text-brand-text-secondary" />
                 {/if}
@@ -792,8 +792,9 @@
                             {#if seg.match}
                               <mark
                                 class="bg-brand-accent/25 text-brand-accent-text font-semibold rounded-xs"
-                                >{seg.text}</mark
                               >
+                                {seg.text}
+                              </mark>
                             {:else}
                               {seg.text}
                             {/if}
@@ -805,20 +806,24 @@
                     </span>
                     <span
                       class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block"
-                      >{entry.fileType ?? ""}</span
                     >
+                      {entry.fileType ?? ""}
+                    </span>
                     <span
                       class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block"
-                      >{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span
                     >
+                      {entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}
+                    </span>
                     <span
                       class="w-40 shrink-0 truncate text-xs hidden @md:block {entry.status ===
                       'notScanned'
                         ? 'text-brand-accent-text'
                         : entry.status === 'inLibrary'
                           ? 'text-brand-text-primary'
-                          : 'text-brand-text-secondary'}">{statusLabel(entry)}</span
+                          : 'text-brand-text-secondary'}"
                     >
+                      {statusLabel(entry)}
+                    </span>
                   </div>
                 {/snippet}
               </VirtualList>
