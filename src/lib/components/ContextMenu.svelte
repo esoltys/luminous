@@ -16,9 +16,11 @@
     children: Snippet;
     /** Menu width in px, for rows that carry more than an icon and a label. Default: w-52. */
     widthPx?: number;
+    /** Stacking layer, for a menu opened from a surface above the default `z-50` (e.g. a toast). */
+    zClass?: string;
   }
 
-  let { x, y, onClose, children, widthPx }: Props = $props();
+  let { x, y, onClose, children, widthPx, zClass = "z-50" }: Props = $props();
 
   let menuEl = $state<HTMLDivElement | null>(null);
   // Real rendered height measured on mount, so callers never supply a height.
@@ -81,7 +83,7 @@
   style="left: {adjustedX}px; top: {adjustedY}px;{maxHeight === undefined
     ? ''
     : ` max-height: ${maxHeight}px;`}"
-  class="fixed z-50 {widthPx === undefined
+  class="fixed {zClass} {widthPx === undefined
     ? 'w-52'
     : ''} overflow-y-auto acrylic-float border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
   role="menu"

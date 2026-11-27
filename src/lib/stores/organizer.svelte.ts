@@ -5,6 +5,8 @@ import { i18n } from "./i18n.svelte";
 import { TOAST_DURATION_MS } from "../constants";
 import { DEFAULT_ORGANIZE_TEMPLATE } from "../utils/organizePresets";
 
+const libraryToasts = toastStore.channel("library");
+
 interface OrganizeConfig {
   auto_organize: boolean;
   template: string;
@@ -183,7 +185,7 @@ class OrganizerStore {
         this.debounceTimer = null;
         if (count > 0) {
           const text = i18n.plural("organizer.autoOrganizeSuccess", count);
-          toastStore.show(text, "success", TOAST_DURATION_MS);
+          libraryToasts.show(text, "success", TOAST_DURATION_MS);
         }
       }, 1200);
     }

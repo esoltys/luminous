@@ -106,6 +106,7 @@ const IDENTICAL_OK_FR = new Set([
   "organizer.chipAlbum", // Same word in this language
   "playerBar.albumHeading", // "Album"
   "organizer.chipGenre", // Same word in this language
+  "notifications.settingsTitle", // "Notifications"
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
   "units.db",

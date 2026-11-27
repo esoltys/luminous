@@ -2492,6 +2492,38 @@ export const frFR: DeepStringRecord<typeof en> = {
     copied: "Copié dans le presse-papiers",
     dismiss: "Fermer la notification",
   },
+  notifications: {
+    options: "Options de notification",
+    turnOffType: "Désactiver toutes les notifications pour {type}",
+    makeHighPriority: "Rendre {type} prioritaire",
+    makeLowPriority: "Rendre {type} non prioritaire",
+    openSettings: "Paramètres des notifications",
+    turnedOff: "Notifications pour {type} désactivées",
+    undo: "Annuler",
+    settingsTitle: "Notifications",
+    settingsSubtitle:
+      "Choisissez les notifications à afficher. Les notifications prioritaires restent jusqu'à ce que vous les fermiez ; les non prioritaires se ferment d'elles-mêmes. Les erreurs et les avertissements s'affichent toujours.",
+    preferenceDefault: "Par défaut",
+    preferenceHigh: "Prioritaire",
+    preferenceLow: "Non prioritaire",
+    preferenceOff: "Désactivées",
+    typeConfirmations: "Confirmations d'action",
+    typeConfirmationsHint:
+      "Retour sur ce que vous venez de faire, comme l'ajout de titres à une playlist",
+    typeLibrary: "Changements de la bibliothèque",
+    typeLibraryHint:
+      "Titres ajoutés ou modifiés dans vos dossiers de musique, et fichiers classés automatiquement",
+    typeTasks: "Tâches en arrière-plan",
+    typeTasksHint:
+      "Progression des analyses, des synchronisations et des autres longues opérations",
+    typeDevices: "Appareils et synchronisation",
+    typeDevicesHint:
+      "Résultats de synchronisation, appareils éjectés et changements de ce qui est synchronisé",
+    typePlayback: "Lecture et sortie audio",
+    typePlaybackHint: "Passage de la sortie audio à un autre appareil ou mode, puis retour",
+    typeCelebrations: "Étapes et célébrations",
+    typeCelebrationsHint: "Étapes de la bibliothèque, playlists terminées et autres célébrations",
+  },
   osNotification: {
     appUpdated: "Luminous a été mis à jour vers la v{version}",
   },

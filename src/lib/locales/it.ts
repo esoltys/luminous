@@ -2378,6 +2378,37 @@ export const it = {
     copied: "Copiato negli appunti",
     dismiss: "Chiudi notifica",
   },
+  notifications: {
+    options: "Opzioni di notifica",
+    turnOffType: "Disattiva tutte le notifiche per {type}",
+    makeHighPriority: "Imposta {type} con priorità alta",
+    makeLowPriority: "Imposta {type} con priorità bassa",
+    openSettings: "Impostazioni notifiche",
+    turnedOff: "Notifiche per {type} disattivate",
+    undo: "Annulla",
+    settingsTitle: "Notifiche",
+    settingsSubtitle:
+      "Scegli quali notifiche mostrare. Quelle con priorità alta restano finché non le chiudi; quelle con priorità bassa si chiudono da sole. Errori e avvisi vengono sempre mostrati.",
+    preferenceDefault: "Predefinito",
+    preferenceHigh: "Priorità alta",
+    preferenceLow: "Priorità bassa",
+    preferenceOff: "Disattivate",
+    typeConfirmations: "Conferme delle azioni",
+    typeConfirmationsHint:
+      "Riscontro su qualcosa che hai appena fatto, come aggiungere brani a una playlist",
+    typeLibrary: "Modifiche alla libreria",
+    typeLibraryHint:
+      "Brani aggiunti o modificati nelle tue cartelle musicali e file organizzati automaticamente",
+    typeTasks: "Attività in background",
+    typeTasksHint: "Avanzamento di scansioni, sincronizzazioni e altre operazioni lunghe",
+    typeDevices: "Dispositivi e sincronizzazione",
+    typeDevicesHint:
+      "Esiti della sincronizzazione, dispositivi espulsi e modifiche a ciò che viene sincronizzato",
+    typePlayback: "Riproduzione e uscita audio",
+    typePlaybackHint: "Passaggio dell'uscita audio a un altro dispositivo o modalità, e ritorno",
+    typeCelebrations: "Traguardi e celebrazioni",
+    typeCelebrationsHint: "Traguardi della libreria, playlist terminate e altre celebrazioni",
+  },
   osNotification: {
     appUpdated: "Luminous è stato aggiornato alla v{version}",
   },

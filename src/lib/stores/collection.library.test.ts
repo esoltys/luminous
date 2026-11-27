@@ -342,7 +342,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     await (collectionStore as any).init();
     const startSpy = vi.spyOn(tasksStore, "startTask");
     const completeSpy = vi.spyOn(tasksStore, "completeTask");
-    const toastSpy = vi.spyOn(toastStore, "show");
+    toastStore.messages = [];
 
     eventCallbacks["scan-progress"]({
       payload: {
@@ -367,12 +367,12 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
 
     expect(startSpy).not.toHaveBeenCalled();
     expect(completeSpy).not.toHaveBeenCalled();
-    expect(toastSpy).not.toHaveBeenCalled();
+    expect(toastStore.messages).toEqual([]);
   });
 
   it("shows persistent toast when scan completes with external tag changes", async () => {
     await (collectionStore as any).init();
-    const toastSpy = vi.spyOn(toastStore, "show");
+    toastStore.messages = [];
 
     eventCallbacks["scan-progress"]({
       payload: {
@@ -386,11 +386,18 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     });
 
     await vi.waitFor(() => {
-      expect(toastSpy).toHaveBeenCalledWith("Music: 3 songs changed outside Luminous", "info");
+      expect(toastStore.messages.filter((m) => m.type === "library")).toEqual([
+        expect.objectContaining({
+          text: "Music: 3 songs changed outside Luminous",
+          variant: "info",
+          type: "library",
+          autoDismisses: false,
+        }),
+      ]);
     });
 
     // When external_changes is 0, no toast is shown
-    toastSpy.mockClear();
+    toastStore.messages = [];
     eventCallbacks["scan-progress"]({
       payload: {
         phase: "done",
@@ -401,10 +408,9 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         external_changes: 0,
       },
     });
-    expect(toastSpy).not.toHaveBeenCalled();
+    expect(toastStore.messages.filter((m) => m.type === "library")).toEqual([]);
 
     // When silent is true, no toast is shown
-    toastSpy.mockClear();
     eventCallbacks["scan-progress"]({
       payload: {
         phase: "done",
@@ -415,8 +421,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         external_changes: 5,
       },
     });
-    expect(toastSpy).not.toHaveBeenCalled();
-    toastSpy.mockRestore();
+    expect(toastStore.messages.filter((m) => m.type === "library")).toEqual([]);
   });
 
   it("resolves directory display names and scan library names correctly", () => {

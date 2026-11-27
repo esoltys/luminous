@@ -141,7 +141,9 @@ class TasksStore {
     task.progress = 1;
     if (task.total !== undefined) task.current = task.total;
     task.finishedAt = Date.now();
-    toastStore.completeTask(id, label, ageOutMs);
+    // The toast's lifetime belongs to the toast store, so the user's notification
+    // preference can keep it up (high priority) or still time it out.
+    toastStore.completeTask(id, label, ageOutMs ?? DEFAULT_AGE_OUT_MS);
     this.scheduleAgeOut(id, ageOutMs);
   }
 
@@ -185,10 +187,18 @@ class TasksStore {
     return task?.status === "running" || task?.status === "pending";
   }
 
+  /**
+   * Drop a finished task from the tracker after `delayMs`. A finished task's toast keeps
+   * its own lifetime in the toast store (completed: auto-dismiss unless the user made
+   * tasks high priority; failed: stays until closed); only a toast still showing as
+   * running, which nothing else would close, is dismissed here.
+   */
   scheduleAgeOut(id: string, delayMs: number = DEFAULT_AGE_OUT_MS) {
     this.clearAgeOutTimer(id);
     const timer = setTimeout(() => {
-      this.clearTask(id);
+      this.ageOutTimers.delete(id);
+      if (toastStore.isTaskActive(id)) toastStore.dismissTask(id);
+      this.tasks = this.tasks.filter((t) => t.id !== id);
     }, delayMs);
     this.ageOutTimers.set(id, timer);
   }

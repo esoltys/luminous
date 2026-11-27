@@ -12,7 +12,12 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
   `windowLayoutStore`; pure styling goes through CSS. Never both for one decision.
 
 - **Toast persistence**: Toasts must never auto-dismiss unless an explicit `durationMs` is passed by the
-  caller. By default, toasts stay visible until the user clicks the `X` button.
+  caller. By default, toasts stay visible until the user clicks the `X` button. The user can override
+  this per notification type (Settings → General → Notifications, or a toast's `⋯` menu): off, high
+  priority (always stays) or low priority (always auto-dismisses). `toastStore` applies the preference,
+  so callers never read it; a source that notifies on its own raises toasts through
+  `toastStore.channel(type)`, and plain `toastStore.show()` is an "Action confirmation". Errors and
+  warnings ignore the preference.
 
 - **Explicit-action-only celebrations**: Micro-animations (heart pulse, confetti, etc.) must fire only in
   response to a deliberate user interaction (e.g., a click handler). Never trigger them from a reactive

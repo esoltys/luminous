@@ -4,7 +4,9 @@ import { render, screen, fireEvent } from "@testing-library/svelte";
 import { tick } from "svelte";
 import Toast from "./Toast.svelte";
 import { toastStore } from "../stores/toast.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { i18n } from "../stores/i18n.svelte";
+import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn().mockResolvedValue(undefined),
@@ -16,6 +18,7 @@ describe("Toast.svelte", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     i18n.currentLocale = "en-CA";
+    toastStore.preferencesLoaded = true;
     writeTextMock = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
@@ -191,5 +194,93 @@ describe("Toast.svelte", () => {
     expect(
       screen.queryByText("Verifying audio authenticity for 13 tracks..."),
     ).not.toBeInTheDocument();
+  });
+
+  describe("notification options menu", () => {
+    beforeEach(() => {
+      toastStore.preferences = {};
+    });
+
+    async function openMenu() {
+      await fireEvent.click(screen.getByRole("button", { name: "Notification options" }));
+      await tick();
+    }
+
+    it("paints nothing until saved preferences are applied, then only what they allow", async () => {
+      toastStore.preferencesLoaded = false;
+      toastStore.channel("library").show("3 songs added", "success");
+      toastStore.show("Added to Queue");
+      render(Toast);
+      expect(screen.queryByText("3 songs added")).toBeNull();
+      expect(screen.queryByText("Added to Queue")).toBeNull();
+
+      vi.mocked(invoke).mockResolvedValueOnce({
+        notification_preferences: JSON.stringify({ library: "off" }),
+      });
+      await toastStore.loadPreferences();
+      await tick();
+
+      expect(screen.queryByText("3 songs added")).toBeNull();
+      expect(screen.getByText("Added to Queue")).toBeInTheDocument();
+    });
+
+    it("is not offered on errors or warnings", () => {
+      toastStore.show("Sync failed", "error");
+      toastStore.show("Duplicates found", "warning");
+      render(Toast);
+      expect(screen.queryByRole("button", { name: "Notification options" })).toBeNull();
+    });
+
+    it("turns off the toast's type and replaces it with an Undo notice", async () => {
+      toastStore.channel("devices").show("Synced Walkman", "success");
+      render(Toast);
+      await openMenu();
+
+      await fireEvent.click(
+        screen.getByRole("menuitem", { name: "Turn off all notifications for Devices and sync" }),
+      );
+      await tick();
+
+      expect(toastStore.preferenceFor("devices")).toBe("off");
+      // The removed toast may still be fading out of the DOM, so check what's on screen in the store.
+      expect(toastStore.messages.map((m) => m.text)).toEqual([
+        "Notifications for Devices and sync turned off",
+      ]);
+      expect(screen.getByText("Notifications for Devices and sync turned off")).toBeInTheDocument();
+      await fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(toastStore.preferenceFor("devices")).toBe("default");
+    });
+
+    it("offers low priority on a toast that stays, and high priority on one that auto-dismisses", async () => {
+      toastStore.show("Added to Queue");
+      render(Toast);
+      await openMenu();
+
+      expect(
+        screen.queryByRole("menuitem", { name: "Make Action confirmations high priority" }),
+      ).toBeNull();
+      await fireEvent.click(
+        screen.getByRole("menuitem", { name: "Make Action confirmations low priority" }),
+      );
+      await tick();
+      expect(toastStore.preferenceFor("confirmations")).toBe("low");
+
+      await openMenu();
+      await fireEvent.click(
+        screen.getByRole("menuitem", { name: "Make Action confirmations high priority" }),
+      );
+      expect(toastStore.preferenceFor("confirmations")).toBe("high");
+    });
+
+    it("opens notification settings in Settings > General", async () => {
+      toastStore.show("Added to Queue");
+      render(Toast);
+      await openMenu();
+
+      await fireEvent.click(screen.getByRole("menuitem", { name: "Notification settings" }));
+
+      expect(navigationStore.activeTab).toBe("settings");
+      expect(navigationStore.settingsSubTab).toBe("general");
+    });
   });
 });
