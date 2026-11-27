@@ -152,4 +152,42 @@ describe("TasksStore", () => {
     vi.advanceTimersByTime(2);
     expect(tasksStore.tasks.length).toBe(0);
   });
+
+  describe("task toasts and notification preferences", () => {
+    const taskToast = (id: string) => toastStore.messages.find((m) => m.task?.taskId === id);
+
+    beforeEach(() => {
+      toastStore.messages = [];
+      toastStore.preferences = {};
+    });
+
+    it("times out a completed task's toast by default", () => {
+      const id = tasksStore.startTask({ label: "Scanning library" });
+      tasksStore.completeTask(id, "Library scanned");
+
+      vi.advanceTimersByTime(8000);
+      expect(taskToast(id)).toBeUndefined();
+      expect(tasksStore.tasks).toEqual([]);
+    });
+
+    it("keeps a completed task's toast up when background tasks are high priority", () => {
+      toastStore.setPreference("tasks", "high");
+      const id = tasksStore.startTask({ label: "Scanning library" });
+      tasksStore.completeTask(id, "Library scanned", 2000);
+
+      vi.advanceTimersByTime(60_000);
+      expect(taskToast(id)?.task?.status).toBe("done");
+      expect(taskToast(id)?.autoDismisses).toBe(false);
+      // The tracker still forgets the finished task.
+      expect(tasksStore.tasks).toEqual([]);
+    });
+
+    it("keeps a failed task's error toast up until it's closed", () => {
+      const id = tasksStore.startTask({ label: "Syncing" });
+      tasksStore.failTask(id, "Disk full");
+
+      vi.advanceTimersByTime(60_000);
+      expect(taskToast(id)?.task?.status).toBe("failed");
+    });
+  });
 });

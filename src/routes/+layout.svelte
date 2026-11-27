@@ -174,8 +174,8 @@
 
   onMount(() => {
     publishScrollbarWidth();
-    // First, so a notification type the user turned off never flashes at startup; a
-    // toast raised before this resolves is re-checked once it does.
+    // The toast stack paints nothing until this resolves, so a notification type the
+    // user turned off never shows at startup, even if raised before this point.
     void toastStore.loadPreferences();
     i18n.init();
     prefs.init();

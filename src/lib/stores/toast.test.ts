@@ -268,6 +268,27 @@ describe("ToastStore notification preferences", () => {
     expect(texts()).toEqual([]);
   });
 
+  it("lifts a low-priority timeout when a batch toast turns into an error", () => {
+    toastStore.setPreference("confirmations", "low");
+    const id = toastStore.startBatch("Saving tags (1/3)");
+    expect(toastStore.messages[0].autoDismisses).toBe(true);
+
+    toastStore.updateBatch(id, "Couldn't save tags", "error");
+
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 10);
+    expect(texts()).toEqual(["Couldn't save tags"]);
+  });
+
+  it("marks preferences loaded even when they can't be read", async () => {
+    toastStore.preferencesLoaded = false;
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("no backend"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await toastStore.loadPreferences();
+
+    expect(toastStore.preferencesLoaded).toBe(true);
+  });
+
   it("treats a missing or corrupt saved value as all defaults", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ notification_preferences: "{not json" });
     await toastStore.loadPreferences();

@@ -168,9 +168,13 @@ class ToastStore {
   }
 
   /**
-   * Restore saved preferences. Call before anything can notify at startup; toasts that
-   * slip in earlier are re-checked here, so a type the user turned off is removed.
+   * Whether saved preferences have been applied (or failed to load). The toast stack
+   * paints nothing until then: a toast raised earlier at startup is kept, and filtered
+   * by the user's preferences before it can ever show.
    */
+  preferencesLoaded = $state(false);
+
+  /** Restore saved preferences, apply them to any toasts raised so far, then let toasts paint. */
   async loadPreferences() {
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
@@ -178,6 +182,8 @@ class ToastStore {
       this.applyPreferences();
     } catch (err) {
       console.error("Failed to load notification preferences:", err);
+    } finally {
+      this.preferencesLoaded = true;
     }
   }
 
@@ -340,7 +346,11 @@ class ToastStore {
     const msg = this.messages.find((m) => m.id === id);
     if (!msg) return;
     msg.text = text;
-    if (variant) msg.variant = variant;
+    if (variant && variant !== msg.variant) {
+      msg.variant = variant;
+      // Becoming an error or warning lifts the preference; leaving one restores it.
+      this.applyPolicy(msg);
+    }
   }
 
   dismiss(id: number) {

@@ -122,7 +122,8 @@
   use:portal
   class="fixed top-0 right-0 lg:right-22 z-[100] grid grid-rows-[minmax(5rem,auto)] justify-items-end gap-2 pointer-events-none px-6 [&>:first-child]:self-center"
 >
-  {#each toastStore.messages as toast (toast.id)}
+  <!-- Nothing paints until saved notification preferences are applied (see loadPreferences). -->
+  {#each toastStore.preferencesLoaded ? toastStore.messages : [] as toast (toast.id)}
     <div
       in:fly={{ x: 24, duration: 200 }}
       out:fade={{ duration: 150 }}
