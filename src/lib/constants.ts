@@ -100,7 +100,7 @@ export const BREAKPOINT_DOCK_SPECTRUM_PX = 1100;
 /** Height below which the app collapses to showing only the PlayerBar (routes/+layout.svelte, collection.svelte.ts). */
 export const HEIGHT_BREAKPOINT_MINIMAL_PX = 160;
 
-/** Height below which detail-view hero headers (Album/Artist) and collection headers compact, so their song table gets the space instead (collection.svelte.ts). */
+/** Height below which detail-view hero headers (Album/Artist) and collection headers compact, so their song table gets the space instead (windowLayoutStore.isDetailHeaderCollapsed). */
 export const HEIGHT_BREAKPOINT_SHORT_PX = 600;
 
 /**

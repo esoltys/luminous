@@ -76,9 +76,6 @@
   let { view }: { view: AutoPlaylistRef } = $props();
 
   let kind = $derived(view.kind);
-  // The header is pinned above the song table, so on a short window it shrinks to just its
-  // actions, as PlaylistView's does, to leave the table usable room.
-  let headerCollapsed = $derived(windowLayoutStore.isPinnedHeaderCollapsed);
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const AUTOPLAYLIST_COL_DEFAULTS: Partial<
@@ -772,13 +769,13 @@
 >
   <div
     data-testid="autoplaylist-header"
-    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {headerCollapsed
+    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
       ? 'py-3'
       : 'pt-6 pb-6'} shrink-0"
   >
     <div class="flex items-stretch justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
-        {#if !headerCollapsed}
+        {#if !windowLayoutStore.isPinnedHeaderCollapsed}
           <h1
             class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
             title={displayName}
@@ -838,7 +835,11 @@
           {/if}
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 {headerCollapsed ? '' : 'mt-3'} select-none">
+        <div
+          class="flex flex-wrap items-center gap-3 {windowLayoutStore.isPinnedHeaderCollapsed
+            ? ''
+            : 'mt-3'} select-none"
+        >
           <Button
             onclick={handlePlayAll}
             disabled={loading || songs.length === 0}
@@ -883,7 +884,7 @@
           </button>
         </div>
 
-        {#if hasFillMode(kind) && playlistId !== undefined && !headerCollapsed}
+        {#if hasFillMode(kind) && playlistId !== undefined && !windowLayoutStore.isPinnedHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
@@ -895,7 +896,7 @@
         {/if}
       </div>
 
-      {#if !headerCollapsed}
+      {#if !windowLayoutStore.isPinnedHeaderCollapsed}
         <div class="hidden @xl:flex h-40 shrink-0 {hasCoverMosaic ? '' : 'w-40'}">
           {#if kind === "genre" && topCovers.length > 0}
             <div
