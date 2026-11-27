@@ -148,8 +148,10 @@
       <div class="flex flex-col gap-0.5 min-w-0">
         <label
           for="notification-preference-{type}"
-          class="text-sm font-medium text-brand-text-primary">{notificationTypeLabel(type)}</label
+          class="text-sm font-medium text-brand-text-primary"
         >
+          {notificationTypeLabel(type)}
+        </label>
         <p class="text-xs text-brand-text-secondary text-pretty">
           {notificationTypeHint(type)}
         </p>
