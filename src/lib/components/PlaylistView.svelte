@@ -783,13 +783,13 @@
     <div class="flex-1 flex flex-col min-h-0 relative z-10 overflow-hidden">
       <div
         data-testid="playlist-header"
-        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed
+        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
           ? 'py-3'
           : 'pt-6 pb-6'} shrink-0"
       >
         <div class="flex items-start justify-between gap-6 relative z-10">
           <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
-            {#if !windowLayoutStore.isDetailHeaderCollapsed}
+            {#if !windowLayoutStore.isPinnedHeaderCollapsed}
               {#if isEditingTitle}
                 <div class="flex items-center gap-2">
                   <input
@@ -862,7 +862,7 @@
             {/if}
 
             <div
-              class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed
+              class="flex flex-wrap items-center gap-3 {windowLayoutStore.isPinnedHeaderCollapsed
                 ? ''
                 : 'mt-3'}"
             >
@@ -949,7 +949,7 @@
               </button>
             </div>
 
-            {#if capabilities.showsPopulationMode && activePlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+            {#if capabilities.showsPopulationMode && activePlaylist && !windowLayoutStore.isPinnedHeaderCollapsed}
               <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
                 <PopulationModeTabs
                   mode={activePlaylist.population_mode ?? "all"}
@@ -957,7 +957,7 @@
                   onChange={handleChangePopulationMode}
                 />
               </div>
-            {:else if capabilities.showsStationUpdated && stationListUpdatedLabel && !windowLayoutStore.isDetailHeaderCollapsed}
+            {:else if capabilities.showsStationUpdated && stationListUpdatedLabel && !windowLayoutStore.isPinnedHeaderCollapsed}
               <div
                 class="text-xs text-brand-text-secondary mt-2"
                 data-testid="station-list-detail-updated"
@@ -967,7 +967,7 @@
             {/if}
           </div>
 
-          {#if !windowLayoutStore.isDetailHeaderCollapsed}
+          {#if !windowLayoutStore.isPinnedHeaderCollapsed}
             {#if capabilities.artworkStyle === "queue"}
               <div
                 class="w-40 h-40 hidden @xl:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40"
@@ -1013,7 +1013,7 @@
       </div>
 
       <div class="flex-1 min-h-0 p-6 flex flex-col gap-6 pb-dock">
-        {#if capabilities.showsGenreHeader && !windowLayoutStore.isDetailHeaderCollapsed}
+        {#if capabilities.showsGenreHeader && !windowLayoutStore.isPinnedHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-3 shrink-0">
             {#if rawGenre}
               <GenreChips genre={rawGenre} variant="full" limit={4} />

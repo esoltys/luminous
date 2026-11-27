@@ -6,7 +6,7 @@ import { playlistsStore } from "../stores/playlists.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { tagsStore } from "../stores/tags.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
-import { HEIGHT_BREAKPOINT_SHORT_PX } from "../constants";
+import { HEIGHT_BREAKPOINT_PINNED_HEADER_PX } from "../constants";
 import { invoke } from "@tauri-apps/api/core";
 import type { Playlist, PlaylistItem, PlaylistSizeFit, Song } from "../types";
 
@@ -119,7 +119,7 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
   });
 
   it("shrinks its pinned header to the actions on a short window, leaving the table room (#2273)", async () => {
-    windowLayoutStore.viewportHeight = HEIGHT_BREAKPOINT_SHORT_PX - 1;
+    windowLayoutStore.viewportHeight = HEIGHT_BREAKPOINT_PINNED_HEADER_PX - 1;
     try {
       const { findByText, getByTestId, queryByRole, getByRole } = render(AutoPlaylistDetailView, {
         view: genreView,
@@ -130,7 +130,7 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
         getByRole("button", { name: "Play" }),
       );
     } finally {
-      windowLayoutStore.viewportHeight = HEIGHT_BREAKPOINT_SHORT_PX + 200;
+      windowLayoutStore.viewportHeight = HEIGHT_BREAKPOINT_PINNED_HEADER_PX + 200;
     }
   });
 

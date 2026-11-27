@@ -211,6 +211,13 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);
     windowLayoutStore.viewportHeight = 800;
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);
+
+    // Pinned playlist headers compact at a taller height than scrolling detail headers (#2273).
+    windowLayoutStore.viewportHeight = 700;
+    expect(windowLayoutStore.isPinnedHeaderCollapsed).toBe(true);
+    expect(windowLayoutStore.isDetailHeaderCollapsed).toBe(false);
+    windowLayoutStore.viewportHeight = 760;
+    expect(windowLayoutStore.isPinnedHeaderCollapsed).toBe(false);
   });
 
   it("toggles sidebar compact state between 64px and expanded width", () => {

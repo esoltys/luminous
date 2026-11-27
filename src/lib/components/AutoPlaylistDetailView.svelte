@@ -78,7 +78,7 @@
   let kind = $derived(view.kind);
   // The header is pinned above the song table, so on a short window it shrinks to just its
   // actions, as PlaylistView's does, to leave the table usable room.
-  let headerCollapsed = $derived(windowLayoutStore.isDetailHeaderCollapsed);
+  let headerCollapsed = $derived(windowLayoutStore.isPinnedHeaderCollapsed);
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const AUTOPLAYLIST_COL_DEFAULTS: Partial<
