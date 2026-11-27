@@ -20,7 +20,7 @@
   } from "phosphor-svelte";
   import {
     toastStore,
-    hasPreferenceMenu,
+    followsPreferences,
     notificationTypeLabel,
     type NotificationType,
   } from "../stores/toast.svelte";
@@ -285,7 +285,7 @@
             {/if}
           </button>
         {/if}
-        {#if hasPreferenceMenu(toast)}
+        {#if followsPreferences(toast)}
           <button
             type="button"
             onclick={(e) => openMenu(toast.id, toast.type, e)}

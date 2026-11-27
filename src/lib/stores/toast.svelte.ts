@@ -45,18 +45,29 @@ const NOTIFICATION_PREFERENCES: readonly NotificationPreference[] = [
 const PREFERENCES_SETTING_KEY = "notification_preferences";
 
 // Spelled out, not built from the type, so the keys stay greppable.
-const TYPE_LABEL_KEYS: Record<NotificationType, string> = {
-  confirmations: "notifications.typeConfirmations",
-  library: "notifications.typeLibrary",
-  tasks: "notifications.typeTasks",
-  devices: "notifications.typeDevices",
-  playback: "notifications.typePlayback",
-  celebrations: "notifications.typeCelebrations",
+const TYPE_TEXT_KEYS: Record<NotificationType, { label: string; hint: string }> = {
+  confirmations: {
+    label: "notifications.typeConfirmations",
+    hint: "notifications.typeConfirmationsHint",
+  },
+  library: { label: "notifications.typeLibrary", hint: "notifications.typeLibraryHint" },
+  tasks: { label: "notifications.typeTasks", hint: "notifications.typeTasksHint" },
+  devices: { label: "notifications.typeDevices", hint: "notifications.typeDevicesHint" },
+  playback: { label: "notifications.typePlayback", hint: "notifications.typePlaybackHint" },
+  celebrations: {
+    label: "notifications.typeCelebrations",
+    hint: "notifications.typeCelebrationsHint",
+  },
 };
 
 /** Localised name of a notification type, e.g. "Library changes". */
 export function notificationTypeLabel(type: NotificationType): string {
-  return i18n.t(TYPE_LABEL_KEYS[type]);
+  return i18n.t(TYPE_TEXT_KEYS[type].label);
+}
+
+/** Localised one-line description of what a notification type covers. */
+export function notificationTypeHint(type: NotificationType): string {
+  return i18n.t(TYPE_TEXT_KEYS[type].hint);
 }
 
 interface ToastAction {
@@ -96,6 +107,7 @@ interface ToastMessage {
 
 /** The subset of the store a notification source needs, with its type bound. */
 interface ToastChannel {
+  /** Show a toast; it stays until dismissed unless `durationMs` is given (or a preference says otherwise). */
   show(
     text: string,
     variant?: ToastVariant,
@@ -103,7 +115,14 @@ interface ToastChannel {
     url?: string,
     action?: ToastAction,
   ): number;
+  /**
+   * Start a long-lived toast for an in-progress batch operation (e.g. processing many
+   * songs): call `toastStore.updateBatch` as it advances and `finishBatch` once it
+   * completes, so the whole operation reads as one notification instead of a toast per
+   * item (#233).
+   */
   startBatch(text: string, variant?: ToastVariant): number;
+  /** Collapse a batch toast into its completion message, which then auto-dismisses. */
   finishBatch(id: number, text: string, variant?: ToastVariant, durationMs?: number): void;
 }
 
@@ -120,10 +139,22 @@ class ToastStore {
       show: (text, variant = "info", durationMs, url, action) =>
         this.add(type, { text, variant, url, action }, durationMs),
       startBatch: (text, variant = "info") => this.add(type, { text, variant }),
-      finishBatch: (id, text, variant = "success", durationMs = TOAST_DURATION_MS) =>
-        this.finishBatchAs(type, id, text, variant, durationMs),
+      finishBatch: (id, text, variant = "success", durationMs = TOAST_DURATION_MS) => {
+        const msg = this.messages.find((m) => m.id === id);
+        if (!msg) {
+          this.add(type, { text, variant }, durationMs);
+          return;
+        }
+        msg.text = text;
+        msg.variant = variant;
+        msg.requestedDurationMs = durationMs;
+        this.applyPolicy(msg);
+      },
     };
   }
+
+  /** Backs the store's own `show`/`startBatch`/`finishBatch`. */
+  private readonly confirmations = this.channel("confirmations");
 
   preferenceFor(type: NotificationType): NotificationPreference {
     return this.preferences[type] ?? "default";
@@ -178,7 +209,11 @@ class ToastStore {
   async loadPreferences() {
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
-      this.preferences = parsePreferences(settings?.[PREFERENCES_SETTING_KEY]);
+      // A choice the user made while this was loading is newer than the saved one.
+      this.preferences = {
+        ...parsePreferences(settings?.[PREFERENCES_SETTING_KEY]),
+        ...this.preferences,
+      };
       this.applyPreferences();
     } catch (err) {
       console.error("Failed to load notification preferences:", err);
@@ -326,14 +361,8 @@ class ToastStore {
   }
 
   /** Show an "Action confirmations" notification; other types go through `channel()`. */
-  show(
-    text: string,
-    variant: ToastVariant = "info",
-    durationMs?: number,
-    url?: string,
-    action?: ToastAction,
-  ) {
-    return this.add("confirmations", { text, variant, url, action }, durationMs);
+  show(...args: Parameters<ToastChannel["show"]>) {
+    return this.confirmations.show(...args);
   }
 
   /** Show a milestone-tier celebration toast with the icon that suits the moment. */
@@ -358,15 +387,9 @@ class ToastStore {
     this.messages = this.messages.filter((m) => m.id !== id);
   }
 
-  /**
-   * Start a long-lived toast representing an in-progress batch operation
-   * (e.g. processing many songs). Unlike `show`, it has no auto-dismiss
-   * timer — call `updateBatch` as progress advances and `finishBatch` once
-   * the batch completes, so the whole operation reads as one notification
-   * instead of a toast per item (#233).
-   */
-  startBatch(text: string, variant: ToastVariant = "info"): number {
-    return this.show(text, variant);
+  /** An "Action confirmations" batch toast; see `ToastChannel.startBatch`. */
+  startBatch(...args: Parameters<ToastChannel["startBatch"]>) {
+    return this.confirmations.startBatch(...args);
   }
 
   /** Update the text/variant of an active batch toast without resetting its lifetime. */
@@ -374,32 +397,9 @@ class ToastStore {
     this.update(id, text, variant);
   }
 
-  /** Collapse an active batch toast into its final completion message, then auto-dismiss. */
-  finishBatch(
-    id: number,
-    text: string,
-    variant: ToastVariant = "success",
-    durationMs: number = TOAST_DURATION_MS,
-  ) {
-    this.finishBatchAs("confirmations", id, text, variant, durationMs);
-  }
-
-  private finishBatchAs(
-    type: NotificationType,
-    id: number,
-    text: string,
-    variant: ToastVariant,
-    durationMs: number,
-  ) {
-    const msg = this.messages.find((m) => m.id === id);
-    if (!msg) {
-      this.add(type, { text, variant }, durationMs);
-      return;
-    }
-    msg.text = text;
-    msg.variant = variant;
-    msg.requestedDurationMs = durationMs;
-    this.applyPolicy(msg);
+  /** Finish an "Action confirmations" batch toast; see `ToastChannel.finishBatch`. */
+  finishBatch(...args: Parameters<ToastChannel["finishBatch"]>) {
+    this.confirmations.finishBatch(...args);
   }
 
   /**
@@ -436,7 +436,7 @@ class ToastStore {
   }
 
   private isSuppressed(msg: ToastMessage): boolean {
-    return !ignoresPreferences(msg) && this.preferenceFor(msg.type) === "off";
+    return followsPreferences(msg) && this.preferenceFor(msg.type) === "off";
   }
 
   /** (Re)start or clear `msg`'s dismiss timer from its requested lifetime and its type's preference. */
@@ -456,7 +456,7 @@ class ToastStore {
   private effectiveDurationMs(msg: ToastMessage): number | undefined {
     const requested =
       msg.requestedDurationMs && msg.requestedDurationMs > 0 ? msg.requestedDurationMs : undefined;
-    if (ignoresPreferences(msg)) return requested;
+    if (!followsPreferences(msg)) return requested;
     switch (this.preferenceFor(msg.type)) {
       case "high":
         return undefined;
@@ -474,19 +474,18 @@ class ToastStore {
   }
 }
 
-/** Errors, warnings, failed tasks and the store's own notices always show as the caller asked. */
-function ignoresPreferences(msg: ToastMessage): boolean {
-  return (
+/**
+ * Whether the user's preference for `msg`'s type applies to it (and so can be changed
+ * from the toast). Errors, warnings, failed tasks and the store's own notices always
+ * show as the caller asked.
+ */
+export function followsPreferences(msg: ToastMessage): boolean {
+  return !(
     msg.isSystemNotice === true ||
     msg.variant === "error" ||
     msg.variant === "warning" ||
     msg.task?.status === "failed"
   );
-}
-
-/** Whether the user can change how `msg`'s type is shown from the toast itself. */
-export function hasPreferenceMenu(msg: ToastMessage): boolean {
-  return !ignoresPreferences(msg);
 }
 
 /** Read the saved preference map, dropping unknown types and values (they mean `default`). */

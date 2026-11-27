@@ -14,18 +14,9 @@
     toastStore,
     NOTIFICATION_TYPES,
     notificationTypeLabel,
-    type NotificationType,
+    notificationTypeHint,
     type NotificationPreference,
   } from "../stores/toast.svelte";
-
-  const NOTIFICATION_TYPE_HINT_KEYS: Record<NotificationType, string> = {
-    confirmations: "notifications.typeConfirmationsHint",
-    library: "notifications.typeLibraryHint",
-    tasks: "notifications.typeTasksHint",
-    devices: "notifications.typeDevicesHint",
-    playback: "notifications.typePlaybackHint",
-    celebrations: "notifications.typeCelebrationsHint",
-  };
 
   // Label and hint keys are spelled out, not built from a suffix, so they stay greppable.
   const AUTO_PLAYLIST_FAMILIES: { family: AutoPlaylistFamily; label: string; hint: string }[] = [
@@ -160,7 +151,7 @@
           class="text-sm font-medium text-brand-text-primary">{notificationTypeLabel(type)}</label
         >
         <p class="text-xs text-brand-text-secondary text-pretty">
-          {i18n.t(NOTIFICATION_TYPE_HINT_KEYS[type])}
+          {notificationTypeHint(type)}
         </p>
       </div>
       <Select

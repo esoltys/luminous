@@ -289,6 +289,18 @@ describe("ToastStore notification preferences", () => {
     expect(toastStore.preferencesLoaded).toBe(true);
   });
 
+  it("keeps a choice made while saved preferences were still loading", async () => {
+    let resolve!: (v: Record<string, string>) => void;
+    vi.mocked(invoke).mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const loading = toastStore.loadPreferences();
+
+    toastStore.setPreference("library", "high");
+    resolve({ notification_preferences: JSON.stringify({ library: "off", tasks: "low" }) });
+    await loading;
+
+    expect(toastStore.preferences).toEqual({ library: "high", tasks: "low" });
+  });
+
   it("treats a missing or corrupt saved value as all defaults", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ notification_preferences: "{not json" });
     await toastStore.loadPreferences();
