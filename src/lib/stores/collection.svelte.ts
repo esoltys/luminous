@@ -51,6 +51,8 @@ import { MAX_RECENT_SEARCHES, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../con
 import { ALBUM_KEY_SEPARATOR, albumKey, sameAlbum } from "$lib/utils/albumKey";
 import { matchWebDavPath } from "../webdavDisplay";
 
+const libraryToasts = toastStore.channel("library");
+
 export interface VisibleColumns {
   // Core columns (on by default)
   track: boolean;
@@ -493,7 +495,7 @@ class CollectionStore {
             // avoid a second, less-accurate "songs added" notification (#233).
             if (added > 0 && !event.payload.silent) {
               const text = i18n.plural("settings.importFinishedToast", added);
-              toastStore.show(text, "success");
+              libraryToasts.show(text, "success");
             }
 
             const externalChanges = event.payload.external_changes ?? 0;
@@ -501,7 +503,7 @@ class CollectionStore {
               const externalText = i18n.plural("collection.externalChangesToast", externalChanges, {
                 name: libraryName,
               });
-              toastStore.show(externalText, "info");
+              libraryToasts.show(externalText, "info");
             }
 
             // Milestone detection (#182): check if total_songs just crossed a

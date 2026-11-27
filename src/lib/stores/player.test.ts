@@ -239,7 +239,6 @@ describe("PlayerStore", () => {
       if (event === "audio-output-unavailable") unavailableCallback = callback;
       return () => {};
     });
-    const showSpy = vi.spyOn(toastStore, "show");
     vi.useFakeTimers();
 
     try {
@@ -247,12 +246,16 @@ describe("PlayerStore", () => {
       await vi.advanceTimersByTimeAsync(50);
 
       unavailableCallback?.({ payload: { message: "no device" } });
-      expect(showSpy).toHaveBeenCalledTimes(1);
-      // No durationMs: the toast must wait for the user to dismiss it.
-      expect(showSpy).toHaveBeenCalledWith(
-        "Audio output unavailable. Connect a device and press play.",
-        "error",
-      );
+      // It must wait for the user to dismiss it.
+      expect(
+        toastStore.messages.filter((m) => m.text.startsWith("Audio output unavailable")),
+      ).toEqual([
+        expect.objectContaining({
+          text: "Audio output unavailable. Connect a device and press play.",
+          variant: "error",
+          autoDismisses: false,
+        }),
+      ]);
 
       // A failed retry replaces the toast rather than stacking a second one.
       unavailableCallback?.({ payload: { message: "still no device" } });
@@ -261,7 +264,6 @@ describe("PlayerStore", () => {
       ).toHaveLength(1);
     } finally {
       vi.useRealTimers();
-      showSpy.mockRestore();
       if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
     }
   });
@@ -480,7 +482,7 @@ describe("PlayerStore", () => {
         if (event === "playback-state") playbackStateCallback = callback;
         return () => {};
       });
-      const showSpy = vi.spyOn(toastStore, "show");
+      const celebrateSpy = vi.spyOn(toastStore, "celebrate");
       try {
         store = new PlayerStore();
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -525,7 +527,7 @@ describe("PlayerStore", () => {
         });
         store.activeContextName = contextName;
         expect(store.autoContinue).toBe(true);
-        showSpy.mockClear();
+        celebrateSpy.mockClear();
         await playbackStateCallback?.({
           payload: {
             ...base,
@@ -536,9 +538,9 @@ describe("PlayerStore", () => {
             remaining_playlist_items: 0,
           },
         });
-        return showSpy.mock.calls.filter(([, variant]) => variant === "milestone");
+        return celebrateSpy.mock.calls;
       } finally {
-        showSpy.mockRestore();
+        celebrateSpy.mockRestore();
         if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
       }
     }
@@ -572,7 +574,7 @@ describe("PlayerStore", () => {
         if (event === "playback-state") playbackStateCallback = callback;
         return () => {};
       });
-      const showSpy = vi.spyOn(toastStore, "show");
+      const celebrateSpy = vi.spyOn(toastStore, "celebrate");
       try {
         windowLayoutStore.isMiniplayer = isMiniplayer;
         windowLayoutStore.immersiveMode = isImmersive;
@@ -621,7 +623,7 @@ describe("PlayerStore", () => {
         });
         store.activeContextName = contextName;
 
-        showSpy.mockClear();
+        celebrateSpy.mockClear();
         // Playback stops naturally
         await playbackStateCallback?.({
           payload: {
@@ -638,10 +640,10 @@ describe("PlayerStore", () => {
         });
         return {
           session: store.completedSession,
-          toasts: showSpy.mock.calls.filter(([, variant]) => variant === "milestone"),
+          toasts: celebrateSpy.mock.calls,
         };
       } finally {
-        showSpy.mockRestore();
+        celebrateSpy.mockRestore();
         windowLayoutStore.isMiniplayer = false;
         windowLayoutStore.immersiveMode = false;
         if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);

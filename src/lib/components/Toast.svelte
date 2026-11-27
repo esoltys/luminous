@@ -13,11 +13,48 @@
     ClipboardIcon as Clipboard,
     CheckIcon as Check,
     ArrowsClockwiseIcon as RefreshCw,
+    ProhibitIcon,
+    ExclamationMarkIcon,
+    ArrowDownIcon,
+    GearIcon,
   } from "phosphor-svelte";
-  import { toastStore } from "../stores/toast.svelte";
+  import {
+    toastStore,
+    hasPreferenceMenu,
+    notificationTypeLabel,
+    type NotificationType,
+  } from "../stores/toast.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
   import Button from "./Button.svelte";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import MoreIcon from "./MoreIcon.svelte";
+
+  const MENU_WIDTH_PX = 288;
+  // The toast stack is z-[100]; its menu has to open above it.
+  const MENU_Z_CLASS = "z-[105]";
+
+  // The type is captured on open, so an action still knows it after the menu (or its
+  // toast) has gone away.
+  let menu = $state<{ toastId: number; type: NotificationType; x: number; y: number } | null>(null);
+  // Closes by itself if its toast goes away (auto-dismissed, or removed by a preference).
+  let menuToast = $derived(
+    menu ? toastStore.messages.find((m) => m.id === menu!.toastId) : undefined,
+  );
+
+  function openMenu(toastId: number, type: NotificationType, event: MouseEvent) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    menu = { toastId, type, x: rect.right - MENU_WIDTH_PX, y: rect.bottom + 4 };
+  }
+
+  function runMenuAction(action: (type: NotificationType) => void) {
+    const type = menu!.type;
+    menu = null;
+    action(type);
+  }
 
   const MILESTONE_ICONS = {
     checks: CheckCheck,
@@ -247,6 +284,19 @@
             {/if}
           </button>
         {/if}
+        {#if hasPreferenceMenu(toast)}
+          <button
+            type="button"
+            onclick={(e) => openMenu(toast.id, toast.type, e)}
+            class="opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
+            title={i18n.t("notifications.options")}
+            aria-label={i18n.t("notifications.options")}
+            aria-haspopup="menu"
+            aria-expanded={menu?.toastId === toast.id}
+          >
+            <MoreIcon class="w-3.5 h-3.5" />
+          </button>
+        {/if}
         <button
           type="button"
           onclick={() => {
@@ -266,3 +316,39 @@
     </div>
   {/each}
 </div>
+
+{#if menu && menuToast}
+  {@const typeName = notificationTypeLabel(menu.type)}
+  <ContextMenu
+    x={menu.x}
+    y={menu.y}
+    onClose={() => (menu = null)}
+    widthPx={MENU_WIDTH_PX}
+    zClass={MENU_Z_CLASS}
+  >
+    <ContextMenuItem
+      icon={ProhibitIcon}
+      label={i18n.t("notifications.turnOffType", { type: typeName })}
+      onclick={() => runMenuAction((type) => toastStore.turnOff(type))}
+    />
+    {#if menuToast.autoDismisses}
+      <ContextMenuItem
+        icon={ExclamationMarkIcon}
+        label={i18n.t("notifications.makeHighPriority", { type: typeName })}
+        onclick={() => runMenuAction((type) => toastStore.setPreference(type, "high"))}
+      />
+    {:else}
+      <ContextMenuItem
+        icon={ArrowDownIcon}
+        label={i18n.t("notifications.makeLowPriority", { type: typeName })}
+        onclick={() => runMenuAction((type) => toastStore.setPreference(type, "low"))}
+      />
+    {/if}
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={GearIcon}
+      label={i18n.t("notifications.openSettings")}
+      onclick={() => runMenuAction(() => navigationStore.openSettings("general"))}
+    />
+  </ContextMenu>
+{/if}

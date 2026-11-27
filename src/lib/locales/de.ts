@@ -2387,6 +2387,38 @@ export const de = {
     copied: "In die Zwischenablage kopiert",
     dismiss: "Benachrichtigung schließen",
   },
+  notifications: {
+    options: "Benachrichtigungsoptionen",
+    turnOffType: "Alle Benachrichtigungen für {type} deaktivieren",
+    makeHighPriority: "{type} mit hoher Priorität anzeigen",
+    makeLowPriority: "{type} mit niedriger Priorität anzeigen",
+    openSettings: "Benachrichtigungseinstellungen",
+    turnedOff: "Benachrichtigungen für {type} deaktiviert",
+    undo: "Rückgängig",
+    settingsTitle: "Benachrichtigungen",
+    settingsSubtitle:
+      "Wähle, welche Benachrichtigungen angezeigt werden. Solche mit hoher Priorität bleiben, bis du sie schließt; solche mit niedriger Priorität schließen sich selbst. Fehler und Warnungen werden immer angezeigt.",
+    preferenceDefault: "Standard",
+    preferenceHigh: "Hohe Priorität",
+    preferenceLow: "Niedrige Priorität",
+    preferenceOff: "Aus",
+    typeConfirmations: "Aktionsbestätigungen",
+    typeConfirmationsHint:
+      "Rückmeldung zu etwas, das du gerade getan hast, etwa Songs zu einer Wiedergabeliste hinzufügen",
+    typeLibrary: "Mediathek-Änderungen",
+    typeLibraryHint:
+      "In deinen Musikordnern hinzugefügte oder geänderte Songs und automatisch organisierte Dateien",
+    typeTasks: "Hintergrundaufgaben",
+    typeTasksHint: "Fortschritt von Scans, Synchronisierungen und anderen lang laufenden Vorgängen",
+    typeDevices: "Geräte und Synchronisierung",
+    typeDevicesHint:
+      "Synchronisierungsergebnisse, ausgeworfene Geräte und Änderungen an dem, was synchronisiert wird",
+    typePlayback: "Wiedergabe und Audioausgabe",
+    typePlaybackHint:
+      "Wechsel der Audioausgabe zu einem anderen Gerät oder Modus und wieder zurück",
+    typeCelebrations: "Meilensteine und Feiern",
+    typeCelebrationsHint: "Mediathek-Meilensteine, beendete Wiedergabelisten und andere Feiern",
+  },
   osNotification: {
     appUpdated: "Luminous wurde auf v{version} aktualisiert",
   },

@@ -17,6 +17,7 @@ describe("organizeStore", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.spyOn(toastStore, "show");
+    toastStore.messages = [];
   });
 
   afterEach(() => {
@@ -86,18 +87,22 @@ describe("organizeStore", () => {
     organizeStore.handleResult({ moved_count: 3, duplicates_count: 0, errors: [] });
 
     // Initially no toast has fired while debouncing
-    expect(toastStore.show).not.toHaveBeenCalled();
+    expect(toastStore.messages).toEqual([]);
 
     // Advance past the 1200ms debounce window
     vi.advanceTimersByTime(1200);
 
-    // Exactly one toast showing the accumulated 8 files, non-sticky (TOAST_DURATION_MS = 4000)
-    expect(toastStore.show).toHaveBeenCalledTimes(1);
-    expect(toastStore.show).toHaveBeenCalledWith(
-      expect.stringContaining("8"),
-      "success",
-      TOAST_DURATION_MS,
-    );
+    // Exactly one toast showing the accumulated 8 files, non-sticky
+    expect(toastStore.messages).toEqual([
+      expect.objectContaining({
+        text: expect.stringContaining("8"),
+        variant: "success",
+        type: "library",
+        autoDismisses: true,
+      }),
+    ]);
+    vi.advanceTimersByTime(TOAST_DURATION_MS);
+    expect(toastStore.messages).toEqual([]);
   });
 
   it("shows sticky warning notification when duplicates are detected", () => {

@@ -31,6 +31,8 @@ import { shuffleArray } from "../utils/shuffle";
 import { AUDIO_BACKEND_LABEL_KEYS } from "../audioOutput";
 import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
 
+const playbackToasts = toastStore.channel("playback");
+
 export interface CompletedSession {
   contextName: string;
   isQueue: boolean;
@@ -233,7 +235,7 @@ export class PlayerStore {
                     { name: oldContextName },
                     `${oldContextName} complete`,
                   );
-              toastStore.show(toastText, "milestone");
+              toastStore.celebrate(toastText, "checks");
             }
           }
           setTimeout(() => {
@@ -313,7 +315,7 @@ export class PlayerStore {
       await this.events.listen("audio-output-unavailable", () => {
         if (this._outputUnavailableToastId !== null)
           toastStore.dismiss(this._outputUnavailableToastId);
-        this._outputUnavailableToastId = toastStore.show(
+        this._outputUnavailableToastId = playbackToasts.show(
           i18n.t(
             "playerBar.outputUnavailableToast",
             undefined,
@@ -331,7 +333,7 @@ export class PlayerStore {
         const mode = i18n.t(AUDIO_BACKEND_LABEL_KEYS[requested]);
         if (this._outputFallbackToastId !== null) toastStore.dismiss(this._outputFallbackToastId);
         this._outputFallbackRequested = requested;
-        this._outputFallbackToastId = toastStore.show(
+        this._outputFallbackToastId = playbackToasts.show(
           i18n.t(`playerBar.${OUTPUT_FALLBACK_KEYS[reason]}`, { mode }),
           "warning",
           undefined,
@@ -373,7 +375,7 @@ export class PlayerStore {
     toastStore.dismiss(this._outputFallbackToastId);
     this._outputFallbackToastId = null;
     this._outputFallbackRequested = null;
-    toastStore.show(i18n.t("playerBar.outputRestored", { mode }), "success");
+    playbackToasts.show(i18n.t("playerBar.outputRestored", { mode }), "success");
   }
 
   private flushPlaybackErrorToast() {

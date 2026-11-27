@@ -9,7 +9,23 @@
   import LanguageSelect from "./LanguageSelect.svelte";
   import Select from "./Select.svelte";
   import Toggle from "./Toggle.svelte";
-  import { GearIcon as Settings, SparkleIcon } from "phosphor-svelte";
+  import { GearIcon as Settings, SparkleIcon, BellIcon } from "phosphor-svelte";
+  import {
+    toastStore,
+    NOTIFICATION_TYPES,
+    notificationTypeLabel,
+    type NotificationType,
+    type NotificationPreference,
+  } from "../stores/toast.svelte";
+
+  const NOTIFICATION_TYPE_HINT_KEYS: Record<NotificationType, string> = {
+    confirmations: "notifications.typeConfirmationsHint",
+    library: "notifications.typeLibraryHint",
+    tasks: "notifications.typeTasksHint",
+    devices: "notifications.typeDevicesHint",
+    playback: "notifications.typePlaybackHint",
+    celebrations: "notifications.typeCelebrationsHint",
+  };
 
   // Label and hint keys are spelled out, not built from a suffix, so they stay greppable.
   const AUTO_PLAYLIST_FAMILIES: { family: AutoPlaylistFamily; label: string; hint: string }[] = [
@@ -119,6 +135,48 @@
       <option value="both">{i18n.t("settings.ratingStyleBoth")}</option>
     </Select>
   </div>
+</div>
+
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 mt-4">
+  <div class="pb-3 flex items-center gap-3">
+    <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+      <BellIcon class="w-5 h-5" />
+    </div>
+    <div class="space-y-1 min-w-0">
+      <h3 class="font-bold text-sm text-brand-text-primary">
+        {i18n.t("notifications.settingsTitle")}
+      </h3>
+      <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
+        {i18n.t("notifications.settingsSubtitle")}
+      </p>
+    </div>
+  </div>
+
+  {#each NOTIFICATION_TYPES as type (type)}
+    <div class="flex items-center justify-between gap-4 py-4">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <label
+          for="notification-preference-{type}"
+          class="text-sm font-medium text-brand-text-primary">{notificationTypeLabel(type)}</label
+        >
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t(NOTIFICATION_TYPE_HINT_KEYS[type])}
+        </p>
+      </div>
+      <Select
+        id="notification-preference-{type}"
+        value={toastStore.preferenceFor(type)}
+        onchange={(e) =>
+          toastStore.setPreference(type, e.currentTarget.value as NotificationPreference)}
+        class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+      >
+        <option value="default">{i18n.t("notifications.preferenceDefault")}</option>
+        <option value="high">{i18n.t("notifications.preferenceHigh")}</option>
+        <option value="low">{i18n.t("notifications.preferenceLow")}</option>
+        <option value="off">{i18n.t("notifications.preferenceOff")}</option>
+      </Select>
+    </div>
+  {/each}
 </div>
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 mt-4">

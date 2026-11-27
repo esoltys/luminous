@@ -98,4 +98,8 @@ export const enGB: Messages = {
     previous: "Previous visualiser: {name}",
     next: "Next visualiser: {name}",
   },
+  notifications: {
+    typeLibraryHint:
+      "Songs added or changed in your music folders, and files organised automatically",
+  },
 };

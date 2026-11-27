@@ -2377,6 +2377,38 @@ export const es = {
     copied: "Copiado al portapapeles",
     dismiss: "Descartar notificación",
   },
+  notifications: {
+    options: "Opciones de notificación",
+    turnOffType: "Desactivar todas las notificaciones de {type}",
+    makeHighPriority: "Dar prioridad alta a {type}",
+    makeLowPriority: "Dar prioridad baja a {type}",
+    openSettings: "Ajustes de notificaciones",
+    turnedOff: "Notificaciones de {type} desactivadas",
+    undo: "Deshacer",
+    settingsTitle: "Notificaciones",
+    settingsSubtitle:
+      "Elige qué notificaciones mostrar. Las de prioridad alta permanecen hasta que las cierras; las de prioridad baja se cierran solas. Los errores y las advertencias siempre se muestran.",
+    preferenceDefault: "Predeterminado",
+    preferenceHigh: "Prioridad alta",
+    preferenceLow: "Prioridad baja",
+    preferenceOff: "Desactivadas",
+    typeConfirmations: "Confirmaciones de acciones",
+    typeConfirmationsHint:
+      "Respuesta a algo que acabas de hacer, como añadir canciones a una lista de reproducción",
+    typeLibrary: "Cambios en la biblioteca",
+    typeLibraryHint:
+      "Canciones añadidas o cambiadas en tus carpetas de música y archivos organizados automáticamente",
+    typeTasks: "Tareas en segundo plano",
+    typeTasksHint: "Progreso de análisis, sincronizaciones y otras operaciones largas",
+    typeDevices: "Dispositivos y sincronización",
+    typeDevicesHint:
+      "Resultados de sincronización, dispositivos expulsados y cambios en lo que se sincroniza",
+    typePlayback: "Reproducción y salida de audio",
+    typePlaybackHint: "Cambio de la salida de audio a otro dispositivo o modo, y vuelta atrás",
+    typeCelebrations: "Hitos y celebraciones",
+    typeCelebrationsHint:
+      "Hitos de la biblioteca, listas de reproducción terminadas y otras celebraciones",
+  },
   osNotification: {
     appUpdated: "Luminous se ha actualizado a la v{version}",
   },

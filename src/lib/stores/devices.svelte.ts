@@ -13,6 +13,8 @@ import { createEventScope } from "../utils/eventScope";
 import { i18n } from "./i18n.svelte";
 import { toastStore } from "./toast.svelte";
 
+const deviceToasts = toastStore.channel("devices");
+
 /**
  * Connected portable players and their syncs (#839): the device list
  * (`devices-changed`), each device's sync state and the progress of running
@@ -186,14 +188,20 @@ class DevicesStore {
     const deviceLabel = deviceName(device);
     try {
       if (!(await this.addSourceToSync(device.id, source))) {
-        toastStore.show(i18n.t("devices.itemAlreadyInSync", { name, device: deviceLabel }), "info");
+        deviceToasts.show(
+          i18n.t("devices.itemAlreadyInSync", { name, device: deviceLabel }),
+          "info",
+        );
         return false;
       }
-      toastStore.show(i18n.t("devices.addedItemToSync", { name, device: deviceLabel }), "success");
+      deviceToasts.show(
+        i18n.t("devices.addedItemToSync", { name, device: deviceLabel }),
+        "success",
+      );
       return true;
     } catch (err) {
       console.error("Failed to add source to device sync:", err);
-      toastStore.show(
+      deviceToasts.show(
         i18n.t("devices.addItemToSyncFailed", { name, device: deviceLabel }),
         "error",
       );
@@ -214,14 +222,14 @@ class DevicesStore {
       if (!(await this.removeSourceFromSync(device.id, source))) {
         return false;
       }
-      toastStore.show(
+      deviceToasts.show(
         i18n.t("devices.removedItemFromSync", { name, device: deviceLabel }),
         "success",
       );
       return true;
     } catch (err) {
       console.error("Failed to remove source from device sync:", err);
-      toastStore.show(
+      deviceToasts.show(
         i18n.t("devices.removeItemFromSyncFailed", { name, device: deviceLabel }),
         "error",
       );
@@ -261,7 +269,7 @@ class DevicesStore {
       .map((id) => ({ kind: "song", id }));
 
     if (newSources.length === 0) {
-      toastStore.show(
+      deviceToasts.show(
         i18n.t("devices.itemAlreadyInSync", { name: itemName, device: deviceLabel }),
         "info",
       );
@@ -272,7 +280,7 @@ class DevicesStore {
       ...state.settings,
       sources: [...state.settings.sources, ...newSources],
     });
-    toastStore.show(
+    deviceToasts.show(
       i18n.plural("devices.addedSongsToSync", newSources.length, {
         count: newSources.length,
         device: deviceLabel,
@@ -306,7 +314,7 @@ class DevicesStore {
       ...state.settings,
       sources: filtered,
     });
-    toastStore.show(
+    deviceToasts.show(
       i18n.plural("devices.removedSongsFromSync", removedCount, {
         count: removedCount,
         device: deviceLabel,
@@ -350,7 +358,7 @@ class DevicesStore {
     // Stays until dismissed, like every toast that isn't given a duration.
     switch (summary.outcome.kind) {
       case "completed":
-        toastStore.show(
+        deviceToasts.show(
           summary.failures.length > 0
             ? i18n.plural("devices.syncDoneWithFailures", summary.failures.length, { device: name })
             : i18n.t("devices.syncDone", { device: name }),
@@ -358,13 +366,13 @@ class DevicesStore {
         );
         break;
       case "stopped":
-        toastStore.show(
+        deviceToasts.show(
           i18n.plural("devices.syncStopped", summary.songsWritten, { device: name }),
           "info",
         );
         break;
       case "failed":
-        toastStore.show(i18n.t("devices.syncFailed", { device: name }), "error");
+        deviceToasts.show(i18n.t("devices.syncFailed", { device: name }), "error");
         break;
     }
   }
@@ -389,10 +397,10 @@ class DevicesStore {
     const name = device ? deviceName(device) : "";
     try {
       await invoke("eject_device", { id });
-      toastStore.show(i18n.t("devices.ejected", { device: name }), "success", 4000);
+      deviceToasts.show(i18n.t("devices.ejected", { device: name }), "success", 4000);
     } catch (err) {
       const code = String(err);
-      toastStore.show(
+      deviceToasts.show(
         i18n.t(code === "device-in-use" ? "devices.ejectInUse" : "devices.ejectFailed", {
           device: name,
         }),

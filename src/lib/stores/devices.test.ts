@@ -51,6 +51,9 @@ import { devicesStore } from "./devices.svelte";
 import { i18n } from "./i18n.svelte";
 import { toastStore } from "./toast.svelte";
 
+/** The text and variant of every toast on screen. */
+const toastsShown = () => toastStore.messages.map((m) => [m.text, m.variant]);
+
 function progress(): SyncProgress {
   return {
     deviceId: walkman.id,
@@ -90,6 +93,7 @@ function summary(outcome: SyncSummary["outcome"], failures = 0): SyncSummary {
 describe("devicesStore", () => {
   beforeEach(async () => {
     i18n.currentLocale = "en-CA";
+    toastStore.messages = [];
     await vi.waitFor(() => expect(devicesStore.loaded).toBe(true));
     running = false;
     ejectError = null;
@@ -112,14 +116,12 @@ describe("devicesStore", () => {
   });
 
   it("names the device and the songs that failed when a sync finishes, and keeps the toast up", () => {
-    const show = vi.spyOn(toastStore, "show");
-
     handlers.get("device-sync-finished")!({ payload: summary({ kind: "completed" }, 2) });
 
-    expect(show).toHaveBeenCalledWith(
+    expect(toastsShown()).toContainEqual([
       "Sync to Walkman complete, but 2 songs couldn't be copied.",
       "warning",
-    );
+    ]);
   });
 
   it("brings the progress drawer back after it was hidden", () => {
@@ -145,19 +147,17 @@ describe("devicesStore", () => {
   });
 
   it("says why a device can't be ejected", async () => {
-    const show = vi.spyOn(toastStore, "show");
     ejectError = "device-in-use";
 
     await devicesStore.eject(walkman.id);
 
-    expect(show).toHaveBeenCalledWith(
+    expect(toastsShown()).toContainEqual([
       expect.stringContaining("another program is using files on it"),
       "error",
-    );
+    ]);
   });
 
   it("adds an album or artist source to sync and shows a success toast", async () => {
-    const show = vi.spyOn(toastStore, "show");
     await devicesStore.refreshSyncState(walkman.id);
 
     const ok = await devicesStore.addToDeviceSync(
@@ -167,7 +167,7 @@ describe("devicesStore", () => {
     );
     expect(ok).toBe(true);
     expect(saved.sources).toContainEqual({ kind: "album", album: "Deliverance", artist: "Opeth" });
-    expect(show).toHaveBeenCalledWith("Added Deliverance to Walkman's sync.", "success");
+    expect(toastsShown()).toContainEqual(["Added Deliverance to Walkman's sync.", "success"]);
 
     // Adding the same source again reports already in sync
     const ok2 = await devicesStore.addToDeviceSync(
@@ -176,11 +176,10 @@ describe("devicesStore", () => {
       "Deliverance",
     );
     expect(ok2).toBe(false);
-    expect(show).toHaveBeenCalledWith("Deliverance is already in Walkman's sync.", "info");
+    expect(toastsShown()).toContainEqual(["Deliverance is already in Walkman's sync.", "info"]);
   });
 
   it("adds multiple songs to sync and reports count in toast", async () => {
-    const show = vi.spyOn(toastStore, "show");
     await devicesStore.refreshSyncState(walkman.id);
 
     const count = await devicesStore.addSongsToSync(walkman, [101, 102, 103]);
@@ -192,11 +191,10 @@ describe("devicesStore", () => {
         { kind: "song", id: 103 },
       ]),
     );
-    expect(show).toHaveBeenCalledWith("Added 3 songs to Walkman's sync.", "success");
+    expect(toastsShown()).toContainEqual(["Added 3 songs to Walkman's sync.", "success"]);
   });
 
   it("removes a source from sync and shows a success toast", async () => {
-    const show = vi.spyOn(toastStore, "show");
     await devicesStore.refreshSyncState(walkman.id);
     await devicesStore.addToDeviceSync(
       walkman,
@@ -215,11 +213,10 @@ describe("devicesStore", () => {
       album: "Deliverance",
       artist: "Opeth",
     });
-    expect(show).toHaveBeenCalledWith("Removed Deliverance from Walkman's sync.", "success");
+    expect(toastsShown()).toContainEqual(["Removed Deliverance from Walkman's sync.", "success"]);
   });
 
   it("toggles device sync state between added and removed", async () => {
-    const show = vi.spyOn(toastStore, "show");
     await devicesStore.refreshSyncState(walkman.id);
 
     // Toggle on
@@ -235,7 +232,7 @@ describe("devicesStore", () => {
         artist: "Opeth",
       }),
     ).toBe(true);
-    expect(show).toHaveBeenCalledWith("Added Deliverance to Walkman's sync.", "success");
+    expect(toastsShown()).toContainEqual(["Added Deliverance to Walkman's sync.", "success"]);
 
     // Toggle off
     await devicesStore.toggleDeviceSync(
@@ -250,6 +247,6 @@ describe("devicesStore", () => {
         artist: "Opeth",
       }),
     ).toBe(false);
-    expect(show).toHaveBeenCalledWith("Removed Deliverance from Walkman's sync.", "success");
+    expect(toastsShown()).toContainEqual(["Removed Deliverance from Walkman's sync.", "success"]);
   });
 });

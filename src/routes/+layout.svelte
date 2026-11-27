@@ -31,6 +31,7 @@
   } from "phosphor-svelte";
 
   import { i18n } from "../lib/stores/i18n.svelte";
+  import { toastStore } from "../lib/stores/toast.svelte";
   import { prefs } from "../lib/stores/prefs.svelte";
   import { tagsStore } from "../lib/stores/tags.svelte";
   import { hierarchySidecarStore } from "../lib/stores/hierarchySidecar.svelte";
@@ -173,6 +174,9 @@
 
   onMount(() => {
     publishScrollbarWidth();
+    // First, so a notification type the user turned off never flashes at startup; a
+    // toast raised before this resolves is re-checked once it does.
+    void toastStore.loadPreferences();
     i18n.init();
     prefs.init();
     // The very first launch shows WelcomeScreen instead of auto-popping the

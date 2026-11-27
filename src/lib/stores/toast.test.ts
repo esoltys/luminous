@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import { toastStore } from "./toast.svelte";
+import { TOAST_DURATION_MS } from "../constants";
 
 describe("ToastStore", () => {
   beforeEach(() => {
@@ -118,5 +120,157 @@ describe("ToastStore", () => {
     vi.advanceTimersByTime(1500);
     expect(toastStore.messages).toHaveLength(1);
     expect(toastStore.messages[0].task?.status).toBe("running");
+  });
+});
+
+describe("ToastStore notification preferences", () => {
+  const devices = toastStore.channel("devices");
+  const texts = () => toastStore.messages.map((m) => m.text);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    toastStore.messages = [];
+    toastStore.preferences = {};
+    vi.mocked(invoke).mockClear();
+  });
+
+  it("tags plain toasts as confirmations and channel toasts with the channel's type", () => {
+    toastStore.show("Added to Queue");
+    devices.show("Synced Walkman", "success");
+    toastStore.celebrate("Your Queue is done", "checks");
+    toastStore.startTask({ taskId: "scan", text: "Scanning" });
+
+    expect(toastStore.messages.map((m) => m.type)).toEqual([
+      "confirmations",
+      "devices",
+      "celebrations",
+      "tasks",
+    ]);
+  });
+
+  it("hides a type that is off, and later calls on the hidden toast's id do nothing", () => {
+    toastStore.setPreference("devices", "off");
+
+    const id = devices.startBatch("Syncing (0/3)");
+    toastStore.updateBatch(id, "Syncing (1/3)");
+    devices.finishBatch(id, "Synced 3 songs");
+    toastStore.show("Added to Queue");
+
+    expect(texts()).toEqual(["Added to Queue"]);
+  });
+
+  it("removes toasts already on screen when their type is turned off", () => {
+    devices.show("Synced Walkman", "success");
+    devices.show("Walkman is full", "error");
+    toastStore.show("Added to Queue");
+
+    toastStore.setPreference("devices", "off");
+
+    expect(texts()).toEqual(["Walkman is full", "Added to Queue"]);
+  });
+
+  it("never hides or times out errors and warnings", () => {
+    toastStore.setPreference("devices", "off");
+    devices.show("Sync failed", "error");
+    toastStore.setPreference("confirmations", "low");
+    toastStore.show("Duplicates found", "warning");
+
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 10);
+    expect(texts()).toEqual(["Sync failed", "Duplicates found"]);
+    expect(toastStore.messages.every((m) => !m.autoDismisses)).toBe(true);
+  });
+
+  it("low priority makes a toast that would stay auto-dismiss, keeping a caller's own duration", () => {
+    toastStore.setPreference("devices", "low");
+    devices.show("Synced Walkman", "success");
+    devices.show("Ejected Walkman", "success", 1000);
+
+    expect(toastStore.messages.every((m) => m.autoDismisses)).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(texts()).toEqual(["Synced Walkman"]);
+    vi.advanceTimersByTime(TOAST_DURATION_MS - 1000);
+    expect(texts()).toEqual([]);
+  });
+
+  it("low priority keeps a running task up and auto-dismisses it once it completes", () => {
+    toastStore.setPreference("tasks", "low");
+    toastStore.startTask({ taskId: "scan", text: "Scanning" });
+
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 2);
+    expect(texts()).toEqual(["Scanning"]);
+
+    toastStore.completeTask("scan", "Scan complete");
+    vi.advanceTimersByTime(TOAST_DURATION_MS);
+    expect(texts()).toEqual([]);
+  });
+
+  it("high priority keeps a toast that would auto-dismiss until the user closes it", () => {
+    toastStore.setPreference("confirmations", "high");
+    toastStore.show("Theme exported", "success", 1000);
+
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 10);
+    expect(texts()).toEqual(["Theme exported"]);
+    expect(toastStore.messages[0].autoDismisses).toBe(false);
+  });
+
+  it("applies a new preference to toasts already on screen", () => {
+    toastStore.show("Added to Queue");
+    expect(toastStore.messages[0].autoDismisses).toBe(false);
+
+    toastStore.setPreference("confirmations", "low");
+    expect(toastStore.messages[0].autoDismisses).toBe(true);
+
+    toastStore.setPreference("confirmations", "high");
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 2);
+    expect(texts()).toEqual(["Added to Queue"]);
+  });
+
+  it("turnOff leaves a short notice whose Undo restores the previous preference", () => {
+    toastStore.setPreference("devices", "low");
+    devices.show("Synced Walkman", "success");
+
+    toastStore.turnOff("devices");
+
+    expect(toastStore.preferenceFor("devices")).toBe("off");
+    expect(toastStore.messages).toHaveLength(1);
+    const notice = toastStore.messages[0];
+    expect(notice.text).toContain("Devices and sync");
+    expect(notice.autoDismisses).toBe(true);
+
+    notice.action!.onClick();
+    expect(toastStore.preferenceFor("devices")).toBe("low");
+    expect(toastStore.messages).toEqual([]);
+  });
+
+  it("saves the preferences as one app setting", () => {
+    toastStore.setPreference("library", "low");
+    toastStore.setPreference("celebrations", "off");
+
+    expect(invoke).toHaveBeenLastCalledWith("set_app_setting", {
+      key: "notification_preferences",
+      value: JSON.stringify({ library: "low", celebrations: "off" }),
+    });
+  });
+
+  it("restores saved preferences, ignoring unknown entries, and applies them to toasts already up", async () => {
+    toastStore.channel("library").show("3 songs added", "success");
+    vi.mocked(invoke).mockResolvedValueOnce({
+      notification_preferences: JSON.stringify({
+        library: "off",
+        tasks: "loud",
+        weather: "low",
+      }),
+    });
+
+    await toastStore.loadPreferences();
+
+    expect(toastStore.preferences).toEqual({ library: "off" });
+    expect(texts()).toEqual([]);
+  });
+
+  it("treats a missing or corrupt saved value as all defaults", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({ notification_preferences: "{not json" });
+    await toastStore.loadPreferences();
+    expect(toastStore.preferences).toEqual({});
   });
 });
