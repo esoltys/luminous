@@ -13,7 +13,7 @@
 //! (`PRIV`, `GEOB`, unrecognised `TXXX`). `iTunSMPB` in particular is never
 //! touched: it carries the encoder delay and padding gapless AAC playback needs.
 
-use crate::audio::save_with_retry;
+use crate::audio::{save_tags_to_path, save_with_retry, TagSave};
 use anyhow::{Context, Result};
 use lofty::config::{ParseOptions, WriteOptions};
 use lofty::file::{AudioFile, FileType};
@@ -203,9 +203,7 @@ impl Scan<'_> {
         let before = self.removed;
         visit(self, tag);
         if self.removed > before {
-            save_with_retry(path, "remove tag cruft", || {
-                tag.save_to_path(path, WriteOptions::default())
-            })?;
+            save_tags_to_path(path, "remove tag cruft", &TagSave(tag))?;
         }
         Ok(())
     }
