@@ -6,13 +6,13 @@
   import { musicbrainzStore } from "../stores/musicbrainz.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import {
-    XIcon as X,
     ArrowUpRightIcon as ArrowUpRight,
     CircleNotchIcon as LoaderCircle,
     WarningIcon as AlertTriangle,
     CheckIcon as Check,
     ShieldCheckIcon as ShieldCheck,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     onClose: () => void;

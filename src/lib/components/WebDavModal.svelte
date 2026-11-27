@@ -13,11 +13,11 @@
   import Toggle from "./Toggle.svelte";
   import {
     CloudIcon,
-    XIcon as X,
     CheckCircleIcon as CheckCircle,
     WarningCircleIcon as WarningCircle,
     CircleNotchIcon as LoaderCircle,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     server: WebDavServer | null;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n, formatNumber } from "../stores/i18n.svelte";
-  import { XIcon as X } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Plus from "./PlusIcon.svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";

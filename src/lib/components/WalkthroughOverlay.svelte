@@ -2,11 +2,8 @@
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
-  import {
-    XIcon as X,
-    CaretLeftIcon as ChevronLeft,
-    CaretRightIcon as ChevronRight,
-  } from "phosphor-svelte";
+  import { CaretLeftIcon as ChevronLeft, CaretRightIcon as ChevronRight } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   const SPOTLIGHT_PADDING = 8;
   const POPOVER_GAP = 16;

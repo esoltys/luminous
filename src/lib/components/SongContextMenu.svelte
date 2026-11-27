@@ -17,12 +17,12 @@
     ShareNetworkIcon as Share,
     RadioIcon as Radio,
     PlaylistIcon as PlaylistIcon,
-    XIcon as X,
     HeartIcon,
     HeartBreakIcon,
     ShieldCheckIcon as ShieldCheck,
     ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Plus from "./PlusIcon.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import type { Snippet } from "svelte";

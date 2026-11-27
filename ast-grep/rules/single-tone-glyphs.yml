@@ -1,0 +1,18 @@
+id: single-tone-glyphs
+language: html
+severity: error
+ignores:
+  - "**/PlusIcon.svelte"
+  - "**/MinusIcon.svelte"
+  - "**/XIcon.svelte"
+  - "**/MoreIcon.svelte"
+message: Import Plus, Minus, X and DotsThree from components/PlusIcon.svelte, MinusIcon.svelte, XIcon.svelte and MoreIcon.svelte, not from phosphor-svelte.
+note: |
+  The app's default icon weight is duotone, which draws a shaded box behind +, -, the close X and
+  the "more" dots, making them hard to read at small sizes. The wrapper components force a
+  single-tone weight everywhere, including when the icon is passed as an `icon={Plus}` prop where
+  a weight can't be set at the call site. Compound glyphs (ListPlus, FolderPlus, FunnelX, XCircle)
+  keep the duotone weight on purpose.
+rule:
+  kind: raw_text
+  regex: '(?s)import\s*\{[^}]*\b(PlusIcon|MinusIcon|XIcon|DotsThreeIcon)\b[^}]*\}\s*from\s*"phosphor-svelte"'

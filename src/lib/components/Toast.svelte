@@ -9,7 +9,6 @@
     SparkleIcon as Sparkles,
     StarIcon as Star,
     FlagBannerFoldIcon as FlagBannerFold,
-    XIcon as X,
     ClipboardIcon as Clipboard,
     CheckIcon as Check,
     ArrowsClockwiseIcon as RefreshCw,
@@ -18,6 +17,7 @@
     ArrowDownIcon,
     GearIcon,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import {
     toastStore,
     followsPreferences,

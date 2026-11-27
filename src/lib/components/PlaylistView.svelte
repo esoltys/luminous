@@ -19,7 +19,6 @@
     ExportIcon as FileOutput,
     PencilSimpleIcon as Pencil,
     CheckIcon as Check,
-    XIcon as X,
     CopyIcon as CopyPlus,
     MusicNotesIcon as Music,
     ArrowsClockwiseIcon as RefreshCw,
@@ -35,6 +34,7 @@
     InfinityIcon as Infinity,
     LinkIcon as Link,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import MoreIcon from "./MoreIcon.svelte";
   import InlineMessage from "./InlineMessage.svelte";
   import { toastStore } from "../stores/toast.svelte";

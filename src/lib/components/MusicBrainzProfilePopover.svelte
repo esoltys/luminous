@@ -13,13 +13,13 @@
   import Toggle from "./Toggle.svelte";
   import InlineMessage from "./InlineMessage.svelte";
   import {
-    XIcon as X,
     ArrowUpRightIcon as ArrowUpRight,
     ArrowRightIcon as ArrowRight,
     CircleNotchIcon as LoaderCircle,
     CheckIcon as Check,
     PauseIcon as Pause,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     isOpen: boolean;

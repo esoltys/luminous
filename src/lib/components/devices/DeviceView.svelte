@@ -8,8 +8,8 @@
     PencilSimpleIcon,
     PlayIcon,
     StopIcon,
-    XIcon,
   } from "phosphor-svelte";
+  import XIcon from "../XIcon.svelte";
   import { navigationStore, type DeviceTab } from "../../stores/navigation.svelte";
   import { devicesStore } from "../../stores/devices.svelte";
   import { playerStore } from "../../stores/player.svelte";

@@ -6,7 +6,8 @@
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
-  import { XIcon as X, PulseIcon as Activity } from "phosphor-svelte";
+  import { PulseIcon as Activity } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     isOpen: boolean;

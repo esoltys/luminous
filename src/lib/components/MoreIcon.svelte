@@ -5,5 +5,6 @@
 </script>
 
 <!-- The app's "more" (three dots) glyph. Always the single-tone bold weight, not the duotone
-     the app-wide IconContext applies, so every "more" button looks the same. -->
+     the app-wide IconContext applies, so every "more" button looks the same. Import this, not
+     phosphor-svelte's `DotsThreeIcon` (`single-tone-glyphs`). -->
 <DotsThreeIcon weight="bold" class={className} />

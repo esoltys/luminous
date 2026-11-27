@@ -1,13 +1,13 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
   import {
-    XIcon as X,
     FileArrowUpIcon as FileUp,
     WarningCircleIcon as AlertCircle,
     CheckCircleIcon as CheckCircle,
     PlugsConnectedIcon as PlugsConnected,
     InfoIcon as Info,
   } from "phosphor-svelte";
+  import X from "../XIcon.svelte";
   import { radioStore } from "../../stores/radio.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import type { RadioConnectionTestResult, RadioDirectoryStation } from "../../types";

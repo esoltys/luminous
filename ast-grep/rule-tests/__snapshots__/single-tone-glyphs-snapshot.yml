@@ -1,0 +1,26 @@
+id: single-tone-glyphs
+snapshots:
+  "<script lang=\"ts\">import { CaretDownIcon, MinusIcon, WarningIcon } from \"phosphor-svelte\";</script>":
+    labels:
+    - source: import { CaretDownIcon, MinusIcon, WarningIcon } from "phosphor-svelte";
+      style: primary
+      start: 18
+      end: 90
+  "<script lang=\"ts\">import { DotsThreeIcon } from \"phosphor-svelte\";</script>":
+    labels:
+    - source: import { DotsThreeIcon } from "phosphor-svelte";
+      style: primary
+      start: 18
+      end: 66
+  "<script lang=\"ts\">import { PlusIcon as Plus } from \"phosphor-svelte\";</script>":
+    labels:
+    - source: import { PlusIcon as Plus } from "phosphor-svelte";
+      style: primary
+      start: 18
+      end: 69
+  "<script lang=\"ts\">import { XIcon as X } from \"phosphor-svelte\";</script>":
+    labels:
+    - source: import { XIcon as X } from "phosphor-svelte";
+      style: primary
+      start: 18
+      end: 63

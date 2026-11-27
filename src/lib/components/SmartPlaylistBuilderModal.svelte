@@ -7,11 +7,11 @@
   import { i18n } from "../stores/i18n.svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import {
-    XIcon as X,
     SparkleIcon as Sparkles,
     SlidersHorizontalIcon as SlidersHorizontal,
     FolderIcon as Folder,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Plus from "./PlusIcon.svelte";
   import { stripEnclosingQuotes, type Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";

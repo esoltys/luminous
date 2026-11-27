@@ -13,11 +13,11 @@
   import Select from "./Select.svelte";
   import {
     CloudIcon,
-    XIcon as X,
     CheckCircleIcon as CheckCircle,
     WarningCircleIcon as WarningCircle,
     CircleNotchIcon as LoaderCircle,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     server: SubsonicServer | null;

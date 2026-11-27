@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    XIcon as X,
     TrashIcon as Trash2,
     GlobeIcon as Globe,
     LinkIcon,
@@ -9,6 +8,7 @@
     CircleNotchIcon as LoaderCircle,
     PencilSimpleIcon as Pencil,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Plus from "./PlusIcon.svelte";
   import { untrack } from "svelte";
   import Button from "./Button.svelte";

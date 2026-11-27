@@ -10,8 +10,8 @@
     StarIcon as Star,
     TagIcon as Tag,
     WarningIcon as AlertTriangle,
-    XIcon as X,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import CoverArt from "./CoverArt.svelte";

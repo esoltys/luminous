@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import {
-    XIcon as X,
     SparkleIcon as Sparkles,
     CheckIcon as Check,
     BroadcastIcon as Radio,
   } from "phosphor-svelte";
+  import X from "../XIcon.svelte";
   import { radioStore } from "../../stores/radio.svelte";
   import { toastStore } from "../../stores/toast.svelte";
   import { i18n } from "../../stores/i18n.svelte";

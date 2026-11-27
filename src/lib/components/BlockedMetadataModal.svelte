@@ -8,11 +8,11 @@
   import { toastStore } from "../stores/toast.svelte";
   import type { MetadataRejection } from "../types";
   import {
-    XIcon as X,
     ProhibitIcon as Prohibit,
     TrashIcon as Trash,
     ShieldSlashIcon as ShieldSlash,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     onClose: () => void;

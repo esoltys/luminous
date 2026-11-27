@@ -19,7 +19,6 @@
   import { TOAST_DURATION_MS } from "../constants";
   import { portal } from "../utils/portal";
   import {
-    XIcon as X,
     FolderIcon as Folder,
     SparkleIcon as Sparkles,
     CheckIcon as Check,
@@ -32,6 +31,7 @@
     PencilSimpleIcon as Edit3,
     ArrowSquareOutIcon as OpenInPicard,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
