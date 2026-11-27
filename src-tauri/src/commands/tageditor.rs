@@ -465,6 +465,12 @@ pub async fn save_song_tags(
     } else {
         (None, None)
     };
+    crate::db::carry_stamps_across_tag_write(
+        &conn,
+        &path.to_string_lossy(),
+        new_mtime,
+        new_filesize,
+    );
 
     let before = crate::tag_history::snapshot_by_id(&conn, song_id).map_err(|e| e.to_string())?;
 
@@ -678,6 +684,7 @@ pub async fn save_file_tags(
             .ok()
             .flatten();
         let (new_mtime, new_filesize) = crate::tag_history::file_mtime_and_size(&p);
+        crate::db::carry_stamps_across_tag_write(&conn, &path, new_mtime, new_filesize);
 
         let _ = conn.execute(
             "UPDATE songs SET
@@ -857,6 +864,9 @@ pub async fn save_album_tags(
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for (song, tags, new_mtime, new_filesize) in &edited {
+        if let Some(path) = song.path.as_deref() {
+            crate::db::carry_stamps_across_tag_write(&tx, path, *new_mtime, *new_filesize);
+        }
         let before = crate::tag_history::snapshot_by_id(&tx, song.id).map_err(|e| e.to_string())?;
         let key = crate::album_key::album_key_for(
             &tags.album,
@@ -1011,6 +1021,7 @@ pub async fn save_batch_file_tags(
             let before = crate::tag_history::snapshot_by_path(&conn, &path_str, 0)
                 .ok()
                 .flatten();
+            crate::db::carry_stamps_across_tag_write(&conn, &path_str, *mtime, *size);
             let _ = conn.execute(
                 "UPDATE songs SET
                     album = ?1,

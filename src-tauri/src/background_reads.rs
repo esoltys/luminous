@@ -39,6 +39,10 @@ const IDLE_POLL: Duration = Duration::from_secs(15);
 const SETTLE_POLL: Duration = Duration::from_secs(1);
 
 /// One kind of background analysis over library files.
+///
+/// A reader whose results are invalidated by the song's file stamp keeps them
+/// in a table listed in `db::AUDIO_ANALYSIS_TABLES`, so Luminous's own tag
+/// writes don't make it read the file again (#2426).
 pub trait BackgroundRead: Send {
     /// Short name for log lines.
     fn name(&self) -> &'static str;

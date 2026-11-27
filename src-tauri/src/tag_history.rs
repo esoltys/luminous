@@ -963,6 +963,7 @@ pub fn restore_song_tags(
     } else {
         (None, None)
     };
+    crate::db::carry_stamps_across_tag_write(conn, &path_str, new_mtime, new_filesize);
 
     let album_artist_trimmed = album_artist.trim();
     let artist_trimmed = artist.trim();
