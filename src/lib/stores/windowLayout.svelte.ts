@@ -9,6 +9,7 @@ import {
   BREAKPOINT_MEDIUM_PX,
   HEIGHT_BREAKPOINT_MINIMAL_PX,
   HEIGHT_BREAKPOINT_SHORT_PX,
+  HEIGHT_BREAKPOINT_PINNED_HEADER_PX,
 } from "../constants";
 
 type ImmersiveView = "cover" | "visualizer";
@@ -497,6 +498,11 @@ class WindowLayoutStore {
 
   get isDetailHeaderCollapsed(): boolean {
     return this.viewportHeight < HEIGHT_BREAKPOINT_SHORT_PX;
+  }
+
+  /** Whether a pinned (non-scrolling) playlist header shrinks to its actions; see HEIGHT_BREAKPOINT_PINNED_HEADER_PX. */
+  get isPinnedHeaderCollapsed(): boolean {
+    return this.viewportHeight < HEIGHT_BREAKPOINT_PINNED_HEADER_PX;
   }
 
   setSidebarWidth(width: number) {

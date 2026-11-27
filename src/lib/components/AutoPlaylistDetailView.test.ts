@@ -5,6 +5,8 @@ import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { tagsStore } from "../stores/tags.svelte";
+import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { HEIGHT_BREAKPOINT_PINNED_HEADER_PX } from "../constants";
 import { invoke } from "@tauri-apps/api/core";
 import type { Playlist, PlaylistItem, PlaylistSizeFit, Song } from "../types";
 
@@ -107,6 +109,29 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
 
     await fireEvent.click(getByTitle("More actions"));
     expect(await findByRole("menuitem", { name: /16 GB/ })).toBeInTheDocument();
+  });
+
+  it("scrolls only the song table, so the header and column headings stay put (#2273)", async () => {
+    const { findByText, getByTestId } = render(AutoPlaylistDetailView, { view: genreView });
+    const scroller = getByTestId("autoplaylist-song-scroll");
+    expect(scroller).toContainElement(await findByText("Track One"));
+    expect(scroller).not.toContainElement(getByTestId("autoplaylist-header"));
+  });
+
+  it("shrinks its pinned header to the actions on a short window, leaving the table room (#2273)", async () => {
+    windowLayoutStore.viewportHeight = HEIGHT_BREAKPOINT_PINNED_HEADER_PX - 1;
+    try {
+      const { findByText, getByTestId, queryByRole, getByRole } = render(AutoPlaylistDetailView, {
+        view: genreView,
+      });
+      await findByText("Track One");
+      expect(queryByRole("heading", { level: 1 })).toBeNull();
+      expect(getByTestId("autoplaylist-header")).toContainElement(
+        getByRole("button", { name: "Play" }),
+      );
+    } finally {
+      windowLayoutStore.viewportHeight = HEIGHT_BREAKPOINT_PINNED_HEADER_PX + 200;
+    }
   });
 
   it("hides the break when the fit was computed for a different order", async () => {

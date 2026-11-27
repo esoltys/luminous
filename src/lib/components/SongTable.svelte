@@ -213,6 +213,13 @@
   let windowEnd = $derived(visible.end);
   let windowRows = $derived(rows.slice(windowStart, windowEnd));
 
+  /**
+   * The table never scrolls itself: its scroller is the nearest ancestor with a scrolling
+   * `overflow-y`, which drives row virtualization and `scrollToKey`/`scrollToIndex`. The
+   * column header is `sticky` to that same box, so a host must not put an `overflow-hidden`
+   * element between the table and its scroller, or the header scrolls away (#2273). A host
+   * that wants the headings always visible makes the table's own frame the scroller.
+   */
   function scrollParent(el: HTMLElement): HTMLElement {
     for (let p = el.parentElement; p; p = p.parentElement) {
       if (/(auto|scroll|overlay)/.test(getComputedStyle(p).overflowY)) return p;

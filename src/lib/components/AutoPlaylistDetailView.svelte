@@ -4,6 +4,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { applySongStats, type SongStatsPayload } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { navigationStore, type AutoPlaylistRef } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -761,74 +762,84 @@
   {/if}
 {/snippet}
 
+<!-- The page itself doesn't scroll: the header stays put and only the song table's frame
+     scrolls, so its column headings stay pinned (#2273). -->
 <div
-  class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full"
-  use:rememberScroll={`autoplaylist:${view.kind}:${view.selector ?? ""}`}
+  class="flex-1 flex flex-col min-h-0 overflow-hidden bg-brand-main text-brand-text-secondary h-full"
 >
   <div
-    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 pt-6 pb-6 shrink-0"
+    data-testid="autoplaylist-header"
+    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
+      ? 'py-3'
+      : 'pt-6 pb-6'} shrink-0"
   >
     <div class="flex items-stretch justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
-        <h1
-          class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
-          title={displayName}
-        >
-          {displayName}
-        </h1>
+        {#if !windowLayoutStore.isPinnedHeaderCollapsed}
+          <h1
+            class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
+            title={displayName}
+          >
+            {displayName}
+          </h1>
 
-        <div
-          class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium"
-        >
-          {#if daypartSourceLabel}
-            <span>{daypartSourceLabel}</span>
+          <div
+            class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium"
+          >
+            {#if daypartSourceLabel}
+              <span>{daypartSourceLabel}</span>
+              <span>•</span>
+            {/if}
+            <span>{i18n.plural("playlists.songsCount", songs.length)}</span>
             <span>•</span>
-          {/if}
-          <span>{i18n.plural("playlists.songsCount", songs.length)}</span>
-          <span>•</span>
-          <span>{totalDurationLabel}</span>
-          {#if updatedLabel}
-            <span>•</span>
-            <span>{i18n.t("playlists.updatedOn", { date: updatedLabel })}</span>
-          {/if}
-          {#if sizeLimit.status}
-            <span>•</span>
-            <span>{sizeLimit.status}</span>
-          {/if}
-        </div>
-
-        {#if readAsGenre}
-          <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
-            <span>{i18n.t("songTags.aliasReadAs", {}, "Read as")}</span>
-            <button
-              type="button"
-              class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
-              onclick={() => navigationStore.viewGenreTag(readAsGenre)}
-            >
-              {readAsGenre}
-            </button>
+            <span>{totalDurationLabel}</span>
+            {#if updatedLabel}
+              <span>•</span>
+              <span>{i18n.t("playlists.updatedOn", { date: updatedLabel })}</span>
+            {/if}
+            {#if sizeLimit.status}
+              <span>•</span>
+              <span>{sizeLimit.status}</span>
+            {/if}
           </div>
-        {:else if includedAliases.length > 0}
-          <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
-            <span>{i18n.t("songTags.aliasesIncluded", {}, "Also includes")}</span>
-            {#each includedAliases as entry (entry.alias)}
+
+          {#if readAsGenre}
+            <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
+              <span>{i18n.t("songTags.aliasReadAs", {}, "Read as")}</span>
               <button
                 type="button"
                 class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
-                aria-label={i18n.t(
-                  "songTags.manageAliasNamed",
-                  { alias: entry.alias },
-                  "Manage alias {alias}",
-                )}
-                onclick={() => tagsStore.openAliasDialog(entry.alias)}
+                onclick={() => navigationStore.viewGenreTag(readAsGenre)}
               >
-                {entry.alias} · {entry.song_count}
+                {readAsGenre}
               </button>
-            {/each}
-          </div>
+            </div>
+          {:else if includedAliases.length > 0}
+            <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
+              <span>{i18n.t("songTags.aliasesIncluded", {}, "Also includes")}</span>
+              {#each includedAliases as entry (entry.alias)}
+                <button
+                  type="button"
+                  class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
+                  aria-label={i18n.t(
+                    "songTags.manageAliasNamed",
+                    { alias: entry.alias },
+                    "Manage alias {alias}",
+                  )}
+                  onclick={() => tagsStore.openAliasDialog(entry.alias)}
+                >
+                  {entry.alias} · {entry.song_count}
+                </button>
+              {/each}
+            </div>
+          {/if}
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
+        <div
+          class="flex flex-wrap items-center gap-3 {windowLayoutStore.isPinnedHeaderCollapsed
+            ? ''
+            : 'mt-3'} select-none"
+        >
           <Button
             onclick={handlePlayAll}
             disabled={loading || songs.length === 0}
@@ -873,7 +884,7 @@
           </button>
         </div>
 
-        {#if hasFillMode(kind) && playlistId !== undefined}
+        {#if hasFillMode(kind) && playlistId !== undefined && !windowLayoutStore.isPinnedHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
@@ -885,61 +896,67 @@
         {/if}
       </div>
 
-      <div class="hidden @xl:flex h-40 shrink-0 {hasCoverMosaic ? '' : 'w-40'}">
-        {#if kind === "genre" && topCovers.length > 0}
-          <div
-            class="h-full p-3.5 bg-brand-main flex items-center justify-center overflow-hidden border relative"
-            style={genreColorIndex !== undefined
-              ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
-              : "background-image: linear-gradient(to bottom right, rgb(22 163 74 / 0.25), rgb(74 222 128 / 0.15)); border-color: rgb(74 222 128 / 0.3); box-shadow: 0 0 28px 3px rgb(74 222 128 / 0.4);"}
-          >
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "no_genre" && topCovers.length > 0}
-          <div
-            class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)] relative"
-          >
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if heroTheme && topCovers.length > 0}
-          <div
-            class="h-full p-3.5 bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border relative"
-          >
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "no_genre"}
-          <div
-            class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)]"
-          >
-            <Music class="w-16 h-16 text-slate-300" />
-          </div>
-        {:else if heroTheme}
-          <div
-            class="w-full h-full bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border"
-          >
-            <PlaylistKindIcon {kind} sizeClass="w-16 h-16" />
-          </div>
-        {:else}
-          <div
-            class="w-full h-full bg-brand-main flex items-center justify-center overflow-hidden border"
-            style={genreColorIndex !== undefined
-              ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
-              : "background-image: linear-gradient(to bottom right, rgb(22 163 74 / 0.25), rgb(74 222 128 / 0.15)); border-color: rgb(74 222 128 / 0.3); box-shadow: 0 0 28px 3px rgb(74 222 128 / 0.4);"}
-          >
-            <Tag
-              class="w-16 h-16"
+      {#if !windowLayoutStore.isPinnedHeaderCollapsed}
+        <div class="hidden @xl:flex h-40 shrink-0 {hasCoverMosaic ? '' : 'w-40'}">
+          {#if kind === "genre" && topCovers.length > 0}
+            <div
+              class="h-full p-3.5 bg-brand-main flex items-center justify-center overflow-hidden border relative"
               style={genreColorIndex !== undefined
-                ? `color: ${genreColorHsl(genreColorIndex)}`
-                : "color: #4ADE80"}
-            />
-          </div>
-        {/if}
-      </div>
+                ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
+                : "background-image: linear-gradient(to bottom right, rgb(22 163 74 / 0.25), rgb(74 222 128 / 0.15)); border-color: rgb(74 222 128 / 0.3); box-shadow: 0 0 28px 3px rgb(74 222 128 / 0.4);"}
+            >
+              <CoverMosaic covers={topCovers} sizeClass="h-full" />
+            </div>
+          {:else if kind === "no_genre" && topCovers.length > 0}
+            <div
+              class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)] relative"
+            >
+              <CoverMosaic covers={topCovers} sizeClass="h-full" />
+            </div>
+          {:else if heroTheme && topCovers.length > 0}
+            <div
+              class="h-full p-3.5 bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border relative"
+            >
+              <CoverMosaic covers={topCovers} sizeClass="h-full" />
+            </div>
+          {:else if kind === "no_genre"}
+            <div
+              class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)]"
+            >
+              <Music class="w-16 h-16 text-slate-300" />
+            </div>
+          {:else if heroTheme}
+            <div
+              class="w-full h-full bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border"
+            >
+              <PlaylistKindIcon {kind} sizeClass="w-16 h-16" />
+            </div>
+          {:else}
+            <div
+              class="w-full h-full bg-brand-main flex items-center justify-center overflow-hidden border"
+              style={genreColorIndex !== undefined
+                ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
+                : "background-image: linear-gradient(to bottom right, rgb(22 163 74 / 0.25), rgb(74 222 128 / 0.15)); border-color: rgb(74 222 128 / 0.3); box-shadow: 0 0 28px 3px rgb(74 222 128 / 0.4);"}
+            >
+              <Tag
+                class="w-16 h-16"
+                style={genreColorIndex !== undefined
+                  ? `color: ${genreColorHsl(genreColorIndex)}`
+                  : "color: #4ADE80"}
+              />
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
   </div>
 
-  <div class="px-6 py-6 flex flex-col pb-dock">
-    <div class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden">
+  <div class="flex-1 min-h-0 px-6 py-6 flex flex-col pb-dock">
+    <div
+      data-testid="autoplaylist-song-scroll"
+      class="flex-1 min-h-0 overflow-x-hidden overflow-y-auto border border-brand-border/60 rounded-xl acrylic-chrome relative"
+      use:rememberScroll={`autoplaylist:${view.kind}:${view.selector ?? ""}`}
+    >
       <SongTable
         rows={tableRows}
         mode="position"

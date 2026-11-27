@@ -5,7 +5,7 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
 - **Responsive breakpoints: viewport for the shell, container for what lives inside it.** Window-size
   tiers are declared once as `--breakpoint-*` in `src/app.css` and mirrored by `BREAKPOINT_*_PX` in
   `src/lib/constants.ts` (`breakpoints.test.ts` fails if they drift): `xs` 420, `sm` 640 (compact to medium),
-  `md` 768 (right panel), `lg` 1024 (sidebar). Height tiers are `HEIGHT_BREAKPOINT_*_PX` (JS-only, 160/600).
+  `md` 768 (right panel), `lg` 1024 (sidebar). Height tiers are `HEIGHT_BREAKPOINT_*_PX` (JS-only, 160/600, plus 760 for the playlist views' pinned headers).
   Use them for app-shell decisions only. Anything that depends on the space a component actually gets (it
   moves with the sidebar and right panel) uses a container query with Tailwind's named sizes (`@sm`, `@3xl`),
   never a viewport prefix or an arbitrary `min-[Npx]` / `@min-[Npx]` value. Structural show/hide goes through

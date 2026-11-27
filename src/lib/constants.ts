@@ -100,8 +100,16 @@ export const BREAKPOINT_DOCK_SPECTRUM_PX = 1100;
 /** Height below which the app collapses to showing only the PlayerBar (routes/+layout.svelte, collection.svelte.ts). */
 export const HEIGHT_BREAKPOINT_MINIMAL_PX = 160;
 
-/** Height below which detail-view hero headers (Playlist/Album/Artist) hide, so their song table gets the space instead (collection.svelte.ts). */
+/** Height below which detail-view hero headers (Album/Artist) and collection headers compact, so their song table gets the space instead (windowLayoutStore.isDetailHeaderCollapsed). */
 export const HEIGHT_BREAKPOINT_SHORT_PX = 600;
+
+/**
+ * Height below which the playlist views' hero headers (PlaylistView, AutoPlaylistDetailView)
+ * shrink to their actions. Higher than {@link HEIGHT_BREAKPOINT_SHORT_PX} because those headers
+ * never scroll away: only the song table scrolls (#2273), and a full ~210px header leaves the
+ * table about 4 rows at 650px.
+ */
+export const HEIGHT_BREAKPOINT_PINNED_HEADER_PX = 760;
 
 /**
  * Per-cover offset/scale/opacity step used to fan out a stack of album
