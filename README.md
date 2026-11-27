@@ -36,15 +36,18 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 
 ## Features
 
-- **Library**: indexes local folders with instant search, including `field:value` syntax (e.g. `genre:rock`) you can save as smart playlists; portable mode keeps the library and settings beside the app
-- **Playback**: gapless MP3, FLAC, Opus, WAV and more; 10-band graphic and 20-band parametric EQ with AutoEq headphone profiles; ASIO output on Windows
+- **Library & curation**: indexes local folders with instant search (including `field:value` syntax like `genre:rock` and `country:` saved as smart playlists), portable mode, duplicate comparison and merging, fake FLAC (provenance) and corrupt file detection, and a Curation shelf for missing artwork or tracks
+- **Files & portable devices**: column-based Files view for browsing local folders, media servers and devices side by side; sync albums, artists or playlists to USB players, SD cards and MTP/Android devices with format conversion and size-fit markers
+- **Playback**: gapless MP3, FLAC, Opus, WAV and more; bit-perfect output (WASAPI exclusive on Windows, direct ALSA on Linux, ASIO on Windows) with native sample-rate switching; playback speed control; 10-band graphic and 20-band parametric EQ with AutoEq headphone profiles remembered per device
+- **Internet radio**: built-in Radio Browser directory and search, custom stations by URL, HLS and HE-AAC streams, live now-playing metadata, auto-updating genre station lists, and stations currently playing your track
+- **Visualizers**: immersive visualizer and playbar mini-view with Voxel Spectrum & Waterfall, Voxel Logo, Stereo Vectorscope (correlation, loudness and true-peak meters), VU Meter, and Salmon Run presets
 - **Remote sources**: OpenSubsonic servers (Navidrome, Gonic, …) and WebDAV, synced into the same library
-- **Playlists**: smart and auto playlists (decades, genres, BPM), Song and Artist Radio built from your own library, custom genre hierarchies
+- **Playlists**: smart, auto (decades, genres, BPM, country, language) and two-way synced File playlists, Song and Artist Radio built from your own library, custom genre hierarchies and genre aliases
 - **Artist and album pages**: filled in from MusicBrainz and fanart.tv, with an info sidebar for whatever you're viewing
 - **Lyrics**: time-synced line by line or word by word, with inline editing and a miniplayer
-- **Tagging and organizing**: tag editor for single or bulk edits (with MusicBrainz Picard handoff) and automatic file organization from your own naming template
+- **Tagging and organizing**: tag editor for single or bulk edits (with tag history and MusicBrainz Picard handoff), tempo and key detection, and automatic file organization from your own naming template
 - **Loves, ratings and stats**: 1–5 stars and loves synced with ListenBrainz, Last.fm scrobbling, listening streaks and top artists
-- **Themes and languages**: preset and cover-art-driven themes, seven languages
+- **Themes, fullscreen and languages**: preset and cover-art-driven themes, fullscreen mode (`Ctrl+Shift+F` / `F11`), and seven languages
 
 See the [release notes](https://github.com/esoltys/luminous/releases) for what's new in each version.
 
