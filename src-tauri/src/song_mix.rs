@@ -36,18 +36,6 @@ const BPM_MAX_BONUS: f64 = 0.25;
 pub struct Tuning {
     /// BPM difference at which the tempo multiplier drops to 1.0.
     pub bpm_window: f32,
-    /// Transitional multiplier boost by star rating / loved until #2288.
-    pub rating: RatingBoost,
-}
-
-/// Additive multiplier bonus by star rating (0–5) and loved status (`1.0 + bonus`);
-/// a loved song gets the larger of `loved` and its rating tier.
-#[derive(Debug, Clone, Copy)]
-pub struct RatingBoost {
-    pub loved: f64,
-    pub five: f64,
-    pub four: f64,
-    pub three: f64,
 }
 
 /// A library song with the fields mixing looks at, normalised for comparison.
@@ -257,26 +245,50 @@ impl Profile {
         } else {
             1.0
         };
-        base * decade_mult * bpm_mult * rating_multiplier(c, &t.rating)
+        base * decade_mult * bpm_mult
     }
 }
 
-fn rating_multiplier(c: &Candidate, r: &RatingBoost) -> f64 {
-    let by_rating = if c.rating >= 5.0 {
-        r.five
+/// Window for the steep recent-play penalty (24 hours).
+const RECENT_DAY_SECS: i64 = 24 * 60 * 60;
+/// Window for the milder recent-play penalty (3 days).
+const RECENT_3_DAYS_SECS: i64 = 3 * 24 * 60 * 60;
+
+// Song-level signals multiply the fit score rather than adding to it: a boost
+// should scale with how well the song fits the profile, not override a poor fit.
+const RECENT_DAY_MULTIPLIER: f64 = 0.15;
+const RECENT_3_DAYS_MULTIPLIER: f64 = 0.5;
+const LOVED_OR_FIVE_STAR_MULTIPLIER: f64 = 2.0;
+const FOUR_STAR_MULTIPLIER: f64 = 1.5;
+const FAVOURITE_ARTIST_MULTIPLIER: f64 = 1.5;
+
+fn is_highly_rated_or_loved(c: &Candidate) -> bool {
+    c.loved == 1 || c.rating >= 4.0
+}
+
+fn song_multipliers(c: &Candidate, loved_artists: &HashSet<&str>, now: i64) -> f64 {
+    let recency = match c.lastplayed {
+        Some(p) if p >= now - RECENT_DAY_SECS => RECENT_DAY_MULTIPLIER,
+        Some(p) if p >= now - RECENT_3_DAYS_SECS => RECENT_3_DAYS_MULTIPLIER,
+        _ => 1.0,
+    };
+    let rating = if c.loved == 1 || c.rating >= 5.0 {
+        LOVED_OR_FIVE_STAR_MULTIPLIER
     } else if c.rating >= 4.0 {
-        r.four
-    } else if c.rating >= 3.0 {
-        r.three
+        FOUR_STAR_MULTIPLIER
     } else {
-        0.0
+        1.0
     };
-    let bonus = if c.loved == 1 {
-        by_rating.max(r.loved)
+    let artist = if c
+        .artist_key
+        .as_deref()
+        .is_some_and(|k| loved_artists.contains(k))
+    {
+        FAVOURITE_ARTIST_MULTIPLIER
     } else {
-        by_rating
+        1.0
     };
-    1.0 + bonus.max(0.0)
+    recency * rating * artist
 }
 
 /// What a caller asks `pick` for.
@@ -286,20 +298,20 @@ pub struct MixOptions<'a> {
     pub limit: usize,
     /// Put the profile's first seed song at index 0.
     pub lead_with_seed: bool,
-    /// Songs last played at or after this unix time are never scored as
-    /// matches and are picked only after every other eligible song.
-    pub defer_played_since: Option<i64>,
+    /// Current unix timestamp (seconds) used for recent-play decay.
+    pub now: i64,
     pub tuning: &'a Tuning,
 }
 
 /// Picks up to `opts.limit` song ids from `pool` to fit `profile`.
 ///
-/// Never returns a seed song (other than the lead) or an excluded song.
-/// Songs are drawn at random weighted by artist tier and song fit, so every
-/// call differs: matching songs are drawn before unmatched ones, and those
-/// before deferred recent plays. Each song's weight is divided by the square
-/// root of how many eligible songs its artist (`artist_key`) has in that
-/// tier, so a big catalogue raises an artist's chances only sub-linearly.
+/// Never returns a seed song (other than the lead), a disliked song
+/// (`loved == -1`), or an excluded song. Songs are drawn at random weighted by
+/// artist tier, song fit, and song-level multipliers (recency, rating/loved,
+/// and artist affinity), so every call differs: matching songs are drawn
+/// before unmatched ones. Each song's weight is divided by the square root of
+/// how many eligible songs its artist (`artist_key`) has in that tier, so a
+/// big catalogue raises an artist's chances only sub-linearly.
 ///
 /// Each artist is capped by `limit`: a seed artist at `ceil(limit / 4)`
 /// songs (the lead included), any other at `max(2, ceil(limit / 12))`. The
@@ -328,6 +340,12 @@ pub fn pick(
     };
 
     let seed_ids: HashSet<i64> = profile.seeds.iter().map(|(id, _)| *id).collect();
+    let loved_artists: HashSet<&str> = pool
+        .candidates
+        .iter()
+        .filter(|c| c.loved != -1 && is_highly_rated_or_loved(c))
+        .filter_map(|c| c.artist_key.as_deref())
+        .collect();
     let mut per_artist: HashMap<&str, usize> = HashMap::new();
     let lead = profile
         .seeds
@@ -342,19 +360,14 @@ pub fn pick(
     let mut entries: Vec<(Tier, f64, &Candidate)> = pool
         .candidates
         .iter()
-        .filter(|c| !seed_ids.contains(&c.id) && !pool.exclusions.excludes(c))
+        .filter(|c| !seed_ids.contains(&c.id) && c.loved != -1 && !pool.exclusions.excludes(c))
         .map(|c| {
-            let deferred = opts
-                .defer_played_since
-                .is_some_and(|cutoff| c.lastplayed.is_some_and(|p| p >= cutoff));
-            if deferred {
-                return (Tier::Deferred, 1.0, c);
-            }
+            let mult = song_multipliers(c, &loved_artists, opts.now);
             let w = profile.song_weight(c, pool, opts.tuning);
             if w > 0.0 {
-                (Tier::Match, w, c)
+                (Tier::Match, w * mult, c)
             } else {
-                (Tier::Unmatched, 1.0, c)
+                (Tier::Unmatched, mult, c)
             }
         })
         .collect();
@@ -528,12 +541,10 @@ fn spread_artists(
 /// earlier tier is drawn before any in a later one, whatever their weights.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Tier {
-    /// Shares something with the profile; weighted by `match_weight`.
+    /// Shares something with the profile; weighted by `song_weight * song_multipliers`.
     Match,
     /// Nothing in common: filler once the matches run out.
     Unmatched,
-    /// Played since `MixOptions::defer_played_since`: used last.
-    Deferred,
 }
 
 /// Orders `entries` by tier, and within a tier by weighted random sampling
@@ -700,15 +711,7 @@ mod tests {
 
     const NOW: i64 = 1_800_000_000;
 
-    const TUNING: Tuning = Tuning {
-        bpm_window: 15.0,
-        rating: RatingBoost {
-            loved: 1.0,
-            five: 1.0,
-            four: 0.5,
-            three: 0.15,
-        },
-    };
+    const TUNING: Tuning = Tuning { bpm_window: 15.0 };
 
     fn song(id: i64, artist: &str, genres: &[&str], decade: i32, bpm: f32) -> Candidate {
         test_song(id, artist, genres, Some(decade), Some(bpm))
@@ -725,7 +728,7 @@ mod tests {
         MixOptions {
             limit,
             lead_with_seed: false,
-            defer_played_since: None,
+            now: NOW,
             tuning: &TUNING,
         }
     }
@@ -891,14 +894,10 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(3);
         for _ in 0..100 {
             let order = sample_order(
-                vec![
-                    (Tier::Deferred, 1e9, 'd'),
-                    (Tier::Unmatched, 1e9, 'u'),
-                    (Tier::Match, 1e-9, 'm'),
-                ],
+                vec![(Tier::Unmatched, 1e9, 'u'), (Tier::Match, 1e-9, 'm')],
                 &mut rng,
             );
-            assert_eq!(order, vec!['m', 'u', 'd']);
+            assert_eq!(order, vec!['m', 'u']);
         }
     }
 
@@ -1041,23 +1040,17 @@ mod tests {
         // Only one artist: the cap (2 at limit 5) gives way to fill the mix.
         let picked = pick_with(&seeds, &pool(catalogue(10, 6, "Same", "Rock")), &opts(5), 7);
         assert_eq!(picked.len(), 5);
-        // Over-cap matches wait behind unmatched and deferred songs alike.
-        let mut recent = song(30, "Recent", &["Jazz"], 1950, 60.0);
-        recent.lastplayed = Some(NOW - 60);
+        // Over-cap matches wait behind unmatched songs.
         let lib = [
             catalogue(10, 6, "Same", "Rock"),
-            vec![song(20, "Other", &["Jazz"], 1950, 60.0), recent],
+            vec![song(20, "Other", &["Jazz"], 1950, 60.0)],
         ]
         .concat();
-        let defer = MixOptions {
-            defer_played_since: Some(NOW - 3600),
-            ..opts(5)
-        };
         for seed in 0..20 {
-            let picked = pick_with(&seeds, &pool(lib.clone()), &defer, seed);
+            let picked = pick_with(&seeds, &pool(lib.clone()), &opts(5), seed);
             assert_eq!(picked.len(), 5);
-            assert!(picked.contains(&20) && picked.contains(&30), "{picked:?}");
-            assert_eq!(by_artist(&picked, 10..16), 3, "{picked:?}");
+            assert!(picked.contains(&20), "{picked:?}");
+            assert_eq!(by_artist(&picked, 10..16), 4, "{picked:?}");
         }
     }
 
@@ -1203,23 +1196,94 @@ mod tests {
     }
 
     #[test]
-    fn deferred_recent_plays_come_after_everything_else() {
+    fn recent_play_is_penalised_but_still_possible() {
         let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
-        let cutoff = NOW - 3600;
         let mut recent = song(10, "X", &["Rock"], 1980, 120.0);
-        recent.lastplayed = Some(NOW - 60);
-        let mut stale = song(11, "Y", &["Jazz"], 1950, 60.0);
-        stale.lastplayed = Some(cutoff - 1);
-        let defer = MixOptions {
-            defer_played_since: Some(cutoff),
-            ..opts(1)
-        };
-        // The recent song is the only match, but an unplayed-lately song
-        // (even unrelated) fills the slot first.
-        let p = pool(vec![recent.clone(), stale]);
-        assert_eq!(pick_with(&seeds, &p, &defer, 7), vec![11]);
-        // With nothing else left, the recent song is still used.
-        assert_eq!(pick_with(&seeds, &pool(vec![recent]), &defer, 7), vec![10]);
+        recent.lastplayed = Some(NOW - 300); // 5 minutes ago -> x0.15
+        let unplayed = song(11, "Y", &["Rock"], 1980, 120.0);
+        let counts = first_pick_counts(&seeds, vec![recent, unplayed], 2000);
+        let recent_picks = *counts.get(&10).unwrap_or(&0);
+        let unplayed_picks = *counts.get(&11).unwrap_or(&0);
+        // Expected ratio is ~0.15 / 1.0 -> ~13% recent.
+        assert!(
+            recent_picks > 150 && recent_picks < 400,
+            "expected ~260 recent picks, got {recent_picks} vs {unplayed_picks}"
+        );
+    }
+
+    #[test]
+    fn three_day_play_gets_milder_penalty() {
+        let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
+        let mut two_days_ago = song(10, "X", &["Rock"], 1980, 120.0);
+        two_days_ago.lastplayed = Some(NOW - 2 * 24 * 60 * 60); // x0.5
+        let unplayed = song(11, "Y", &["Rock"], 1980, 120.0); // x1.0
+        let counts = first_pick_counts(&seeds, vec![two_days_ago, unplayed], 2000);
+        let ratio = *counts.get(&11).unwrap_or(&0) as f64 / *counts.get(&10).unwrap_or(&1) as f64;
+        assert!(
+            (1.7..2.3).contains(&ratio),
+            "expected ~2x unplayed over 2-day-old play, got {ratio:.2}"
+        );
+    }
+
+    #[test]
+    fn loved_and_rated_songs_scale_weight() {
+        let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
+        // Same artist so both share the artist-affinity multiplier.
+        let mut loved = song(10, "X", &["Rock"], 1980, 120.0);
+        loved.loved = 1; // x2.0
+        let plain = song(11, "X", &["Rock"], 1980, 120.0); // x1.0
+        let counts = first_pick_counts(&seeds, vec![loved, plain], 2000);
+        let ratio = *counts.get(&10).unwrap_or(&0) as f64 / *counts.get(&11).unwrap_or(&1) as f64;
+        assert!(
+            (1.7..2.3).contains(&ratio),
+            "expected ~2x loved picks, got {ratio:.2}"
+        );
+
+        let mut four_star = song(12, "Y", &["Rock"], 1980, 120.0);
+        four_star.rating = 4.0; // x1.5
+        let plain_y = song(13, "Y", &["Rock"], 1980, 120.0); // x1.0
+        let counts = first_pick_counts(&seeds, vec![four_star, plain_y], 2000);
+        let ratio = *counts.get(&12).unwrap_or(&0) as f64 / *counts.get(&13).unwrap_or(&1) as f64;
+        assert!(
+            (1.25..1.75).contains(&ratio),
+            "expected ~1.5x 4-star picks, got {ratio:.2}"
+        );
+    }
+
+    #[test]
+    fn favourite_artist_boosts_other_songs_by_that_artist() {
+        let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
+        // Artist X has a loved song (excluded as a different genre/unmatched or
+        // simply another song in the pool), boosting X's unloved song 10 by x1.5.
+        let mut fav_hit = song(9, "X", &["Jazz"], 1950, 60.0);
+        fav_hit.loved = 1;
+        let x_unloved = song(10, "X", &["Rock"], 1980, 120.0);
+        let y_unloved = song(11, "Y", &["Rock"], 1980, 120.0);
+        let p = pool(vec![fav_hit, x_unloved, y_unloved]);
+        let mut x_picks = 0usize;
+        let mut y_picks = 0usize;
+        for seed in 0..2000 {
+            match pick_with(&seeds, &p, &opts(1), seed)[0] {
+                10 => x_picks += 1,
+                11 => y_picks += 1,
+                _ => {}
+            }
+        }
+        // X has 2 songs in Match? No, fav_hit is Jazz (Unmatched), so X has 1
+        // Match song (weight 1.5) vs Y's 1 Match song (weight 1.0).
+        let ratio = x_picks as f64 / y_picks.max(1) as f64;
+        assert!(
+            (1.25..1.75).contains(&ratio),
+            "expected ~1.5x for favourite artist, got {ratio:.2} ({x_picks} vs {y_picks})"
+        );
+    }
+
+    #[test]
+    fn disliked_songs_are_never_picked() {
+        let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
+        let mut disliked = song(10, "X", &["Rock"], 1980, 120.0);
+        disliked.loved = -1;
+        assert!(pick_default(&seeds, vec![disliked], 5).is_empty());
     }
 
     #[test]

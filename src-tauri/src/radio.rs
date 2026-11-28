@@ -7,7 +7,7 @@
 //! queue and starts playing immediately.
 
 use crate::models::{playable_library_song_where, PlayContext, ShuffleMode};
-use crate::song_mix::{self, Candidate, MixOptions, Pool, Profile, RatingBoost, Tuning};
+use crate::song_mix::{self, Candidate, MixOptions, Pool, Profile, Tuning};
 use crate::AppState;
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -18,22 +18,14 @@ use std::time::Duration;
 /// Default target size of a generated radio queue.
 pub const DEFAULT_RADIO_LIMIT: usize = 40;
 
-/// Radio's tuning: loved songs boosted like 5-star ones.
-const TUNING: Tuning = Tuning {
-    bpm_window: 15.0,
-    rating: RatingBoost {
-        loved: 1.0,
-        five: 1.0,
-        four: 0.5,
-        three: 0.15,
-    },
-};
+/// Radio's tuning.
+const TUNING: Tuning = Tuning { bpm_window: 15.0 };
 
-fn mix_options(limit: usize) -> MixOptions<'static> {
+fn mix_options(limit: usize, now: i64) -> MixOptions<'static> {
     MixOptions {
         limit,
         lead_with_seed: true,
-        defer_played_since: None,
+        now,
         tuning: &TUNING,
     }
 }
@@ -233,7 +225,7 @@ pub async fn generate_radio_songs(
         Ok(song_mix::pick(
             &profile,
             &pool,
-            &mix_options(limit),
+            &mix_options(limit, crate::clock::unix_now()),
             &mut rand::rng(),
         ))
     })
@@ -307,7 +299,7 @@ mod tests {
         let picked = song_mix::pick(
             &profile,
             &pool,
-            &mix_options(DEFAULT_RADIO_LIMIT),
+            &mix_options(DEFAULT_RADIO_LIMIT, 1_800_000_000),
             &mut StdRng::seed_from_u64(42),
         );
         assert_eq!(picked.len(), DEFAULT_RADIO_LIMIT);
