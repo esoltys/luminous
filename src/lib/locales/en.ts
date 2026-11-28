@@ -2348,6 +2348,15 @@ export const en = {
     typePlaybackHint: "Audio output switching to another device or mode, and switching back",
     typeCelebrations: "Milestones and celebrations",
     typeCelebrationsHint: "Library milestones, finished playlists and other celebrations",
+    batchWaitLabel: "How often to show {type}",
+    batchWaitNone: "Show right away",
+    batchWait10s: "Group every 10 seconds",
+    batchWait1m: "Group every minute",
+    batchWait5m: "Group every 5 minutes",
+    moreCount: {
+      one: "+{count} more",
+      other: "+{count} more",
+    },
   },
   osNotification: {
     appUpdated: "Luminous updated to v{version}",

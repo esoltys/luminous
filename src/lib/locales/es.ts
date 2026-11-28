@@ -2408,6 +2408,15 @@ export const es = {
     typeCelebrations: "Hitos y celebraciones",
     typeCelebrationsHint:
       "Hitos de la biblioteca, listas de reproducción terminadas y otras celebraciones",
+    batchWaitLabel: "Con qué frecuencia mostrar {type}",
+    batchWaitNone: "Mostrar al momento",
+    batchWait10s: "Agrupar cada 10 segundos",
+    batchWait1m: "Agrupar cada minuto",
+    batchWait5m: "Agrupar cada 5 minutos",
+    moreCount: {
+      one: "+{count} más",
+      other: "+{count} más",
+    },
   },
   osNotification: {
     appUpdated: "Luminous se ha actualizado a la v{version}",

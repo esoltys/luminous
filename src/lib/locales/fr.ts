@@ -2524,6 +2524,15 @@ export const fr: DeepStringRecord<typeof en> = {
     typeCelebrations: "Étapes et célébrations",
     typeCelebrationsHint:
       "Étapes de la bibliothèque, listes de lecture terminées et autres célébrations",
+    batchWaitLabel: "Fréquence d'affichage : {type}",
+    batchWaitNone: "Afficher tout de suite",
+    batchWait10s: "Regrouper aux 10 secondes",
+    batchWait1m: "Regrouper à chaque minute",
+    batchWait5m: "Regrouper aux 5 minutes",
+    moreCount: {
+      one: "+{count} autre",
+      other: "+{count} autres",
+    },
   },
   osNotification: {
     appUpdated: "Luminous a été mis à jour vers la v{version}",

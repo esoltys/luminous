@@ -134,17 +134,34 @@ class TasksStore {
   }
 
   completeTask(id: string, label?: string, ageOutMs?: number) {
+    if (!this.markDone(id, label)) return;
+    // The toast's lifetime belongs to the toast store, so the user's notification
+    // preference can keep it up (high priority) or still time it out.
+    toastStore.completeTask(id, label, ageOutMs ?? DEFAULT_AGE_OUT_MS);
+    this.scheduleAgeOut(id, ageOutMs);
+  }
+
+  /**
+   * Mark a task done in the tracker and take its live toast away without showing a
+   * completion, for a source that announces the result itself (e.g. through a toast
+   * channel's `report`, so close-together completions add up).
+   */
+  completeQuietly(id: string, label?: string) {
+    if (!this.markDone(id, label)) return;
+    toastStore.dismissTask(id);
+    this.scheduleAgeOut(id);
+  }
+
+  /** Record `id` as done; false if no such task is tracked. */
+  private markDone(id: string, label?: string): boolean {
     const task = this.tasks.find((t) => t.id === id);
-    if (!task) return;
+    if (!task) return false;
     if (label && label !== "Done") task.label = label;
     task.status = "done";
     task.progress = 1;
     if (task.total !== undefined) task.current = task.total;
     task.finishedAt = Date.now();
-    // The toast's lifetime belongs to the toast store, so the user's notification
-    // preference can keep it up (high priority) or still time it out.
-    toastStore.completeTask(id, label, ageOutMs ?? DEFAULT_AGE_OUT_MS);
-    this.scheduleAgeOut(id, ageOutMs);
+    return true;
   }
 
   failTask(id: string, error?: string) {

@@ -301,9 +301,168 @@ describe("ToastStore notification preferences", () => {
     expect(toastStore.preferences).toEqual({ library: "high", tasks: "low" });
   });
 
+  it("restores saved batch waits, dropping unbatchable types and unknown values", async () => {
+    toastStore.batchWaits = {};
+    vi.mocked(invoke).mockResolvedValueOnce({
+      notification_batch_waits: JSON.stringify({ library: 60, devices: 7, tasks: 10 }),
+    });
+    await toastStore.loadPreferences();
+    expect(toastStore.batchWaits).toEqual({ library: 60 });
+  });
+
   it("treats a missing or corrupt saved value as all defaults", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ notification_preferences: "{not json" });
     await toastStore.loadPreferences();
     expect(toastStore.preferences).toEqual({});
+  });
+});
+
+describe("ToastStore batching", () => {
+  const library = toastStore.channel("library");
+  const devices = toastStore.channel("devices");
+  const moved = { summaryKey: "organizer.autoOrganizeSuccess", settleMs: 1200 };
+  const added = { summaryKey: "settings.importFinishedToast" };
+  const texts = () => toastStore.messages.map((m) => m.text);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.runOnlyPendingTimers();
+    toastStore.messages = [];
+    toastStore.preferences = {};
+    toastStore.batchWaits = {};
+    vi.mocked(invoke).mockClear();
+  });
+
+  it("shows a report with no wait and no settle time at once", () => {
+    library.report(added, 3);
+    expect(texts()).toEqual(["3 songs added"]);
+  });
+
+  it("sums a burst of reports once the source settles, even at right away", () => {
+    library.report(moved, 5);
+    vi.advanceTimersByTime(1000);
+    library.report(moved, 3);
+    vi.advanceTimersByTime(1199);
+    expect(texts()).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(texts()).toEqual(["Auto-organized 8 files"]);
+  });
+
+  it("holds reports for the type's wait, counted from the first one", () => {
+    toastStore.setBatchWait("library", 60);
+    library.report(added, 1);
+    vi.advanceTimersByTime(30_000);
+    library.report(added, 2);
+    vi.advanceTimersByTime(29_999);
+    expect(texts()).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(texts()).toEqual(["3 songs added"]);
+  });
+
+  it("never sums different kinds, or the same kind with different details", () => {
+    toastStore.setBatchWait("library", 10);
+    const external = (name: string) => ({
+      summaryKey: "collection.externalChangesToast",
+      vars: { name },
+    });
+    library.report(added, 2);
+    library.report(external("Music"), 1);
+    library.report(external("Podcasts"), 4);
+    vi.advanceTimersByTime(10_000);
+    expect(texts()).toEqual([
+      "2 songs added",
+      "Music: 1 song changed outside Luminous",
+      "Podcasts: 4 songs changed outside Luminous",
+    ]);
+  });
+
+  it("caps how long a source that never goes quiet can hold its batch", () => {
+    for (let i = 0; i < 40; i++) {
+      library.report(moved, 1);
+      vi.advanceTimersByTime(1000);
+    }
+    expect(texts()).toEqual(["Auto-organized 30 files"]);
+  });
+
+  it("drops a pending batch whose type is turned off before it shows", () => {
+    toastStore.setBatchWait("library", 10);
+    library.report(added, 2);
+    toastStore.setPreference("library", "off");
+    vi.advanceTimersByTime(10_000);
+    expect(texts()).toEqual([]);
+  });
+
+  it("shows a held batch now when the wait is cut to right away", () => {
+    toastStore.setBatchWait("library", 300);
+    library.report(added, 2);
+    toastStore.setBatchWait("library", 0);
+    expect(texts()).toEqual(["2 songs added"]);
+  });
+
+  it("ignores a wait on types that never batch", () => {
+    toastStore.setBatchWait("tasks", 60);
+    toastStore.channel("tasks").report(added, 1);
+    expect(texts()).toEqual(["1 song added"]);
+  });
+
+  it("saves the waits as one app setting", () => {
+    toastStore.setBatchWait("devices", 10);
+    expect(invoke).toHaveBeenLastCalledWith("set_app_setting", {
+      key: "notification_batch_waits",
+      value: JSON.stringify({ devices: 10 }),
+    });
+  });
+
+  it("folds plain toasts of a waiting type into the newest one, with a count", () => {
+    toastStore.setBatchWait("devices", 10);
+    const first = devices.show("Walkman connected", "success");
+    const second = devices.show("Walkman synced", "success");
+
+    expect(second).toBe(first);
+    expect(texts()).toEqual(["Walkman synced"]);
+    expect(toastStore.messages[0].moreCount).toBe(1);
+
+    vi.advanceTimersByTime(10_000);
+    devices.show("Walkman ejected", "success");
+    expect(texts()).toEqual(["Walkman synced", "Walkman ejected"]);
+  });
+
+  it("never folds errors, warnings or toasts with an action or link", () => {
+    toastStore.setBatchWait("devices", 10);
+    devices.show("Walkman connected", "success");
+    devices.show("Sync failed", "error");
+    devices.show("Walkman is nearly full", "warning");
+    devices.show("Update ready", "info", undefined, undefined, { label: "Go", onClick: vi.fn() });
+    devices.show("Release notes", "info", undefined, "https://example.com");
+
+    expect(texts()).toHaveLength(5);
+    expect(toastStore.messages.every((m) => !m.moreCount)).toBe(true);
+  });
+
+  it("never folds into a toast that has since turned into an error", () => {
+    toastStore.setBatchWait("devices", 10);
+    const id = devices.show("Syncing Walkman", "info");
+    toastStore.update(id, "Sync failed", "error");
+    devices.show("Walkman connected", "success");
+    expect(texts()).toEqual(["Sync failed", "Walkman connected"]);
+  });
+
+  it("holds a report raised before saved waits load to the wait they bring", async () => {
+    library.report(moved, 2);
+    vi.mocked(invoke).mockResolvedValueOnce({
+      notification_batch_waits: JSON.stringify({ library: 60 }),
+    });
+    await toastStore.loadPreferences();
+
+    vi.advanceTimersByTime(1200);
+    expect(texts()).toEqual([]);
+    vi.advanceTimersByTime(60_000 - 1200);
+    expect(texts()).toEqual(["Auto-organized 2 files"]);
+  });
+
+  it("doesn't fold plain toasts when the type has no wait", () => {
+    devices.show("Walkman connected", "success");
+    devices.show("Walkman synced", "success");
+    expect(texts()).toHaveLength(2);
   });
 });

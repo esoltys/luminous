@@ -7,6 +7,12 @@ import { DEFAULT_ORGANIZE_TEMPLATE } from "../utils/organizePresets";
 
 const libraryToasts = toastStore.channel("library");
 
+const AUTO_ORGANIZE_MOVED = {
+  summaryKey: "organizer.autoOrganizeSuccess",
+  durationMs: TOAST_DURATION_MS,
+  settleMs: 1200,
+};
+
 interface OrganizeConfig {
   auto_organize: boolean;
   template: string;
@@ -90,8 +96,6 @@ class OrganizerStore {
   isDraftActive = $state<boolean>(false);
 
   private events = createEventScope(import.meta.hot);
-  private pendingMovedCount = 0;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   setDraftActive(active: boolean) {
     this.isDraftActive = active;
@@ -175,20 +179,9 @@ class OrganizerStore {
   handleResult(result: AutoOrganizeResult) {
     const { moved_count, duplicates_count, errors } = result;
 
-    // 1. Success notification: batched and non-sticky (auto-dismisses in TOAST_DURATION_MS = 4000)
-    if (moved_count > 0) {
-      this.pendingMovedCount += moved_count;
-      if (this.debounceTimer) clearTimeout(this.debounceTimer);
-      this.debounceTimer = setTimeout(() => {
-        const count = this.pendingMovedCount;
-        this.pendingMovedCount = 0;
-        this.debounceTimer = null;
-        if (count > 0) {
-          const text = i18n.plural("organizer.autoOrganizeSuccess", count);
-          libraryToasts.show(text, "success", TOAST_DURATION_MS);
-        }
-      }, 1200);
-    }
+    // 1. Moves arrive as one event per file group; the toast store sums a burst into one
+    // auto-dismissing "N files moved" toast (after the user's wait, if they set one).
+    libraryToasts.report(AUTO_ORGANIZE_MOVED, moved_count);
 
     // 2. Duplicates detected: sticky warning (remains until manually dismissed)
     if (duplicates_count > 0) {
@@ -206,10 +199,6 @@ class OrganizerStore {
   /** Stops listening to backend events. */
   dispose() {
     this.events.dispose();
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
-    }
   }
 
   /** @deprecated Use {@link dispose} */

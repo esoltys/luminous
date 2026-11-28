@@ -2408,6 +2408,15 @@ export const it = {
     typePlaybackHint: "Passaggio dell'uscita audio a un altro dispositivo o modalità, e ritorno",
     typeCelebrations: "Traguardi e celebrazioni",
     typeCelebrationsHint: "Traguardi della libreria, playlist terminate e altre celebrazioni",
+    batchWaitLabel: "Ogni quanto mostrare {type}",
+    batchWaitNone: "Mostra subito",
+    batchWait10s: "Raggruppa ogni 10 secondi",
+    batchWait1m: "Raggruppa ogni minuto",
+    batchWait5m: "Raggruppa ogni 5 minuti",
+    moreCount: {
+      one: "+{count} altra",
+      other: "+{count} altre",
+    },
   },
   osNotification: {
     appUpdated: "Luminous è stato aggiornato alla v{version}",

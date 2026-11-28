@@ -249,6 +249,13 @@
         >
           {toast.text}
         </button>
+      {:else if toast.moreCount}
+        <span class="flex-1 min-w-0 flex flex-col">
+          <span class="wrap-anywhere text-pretty">{toast.text}</span>
+          <span class="text-xs text-brand-text-secondary" data-toast-more>
+            {i18n.plural("notifications.moreCount", toast.moreCount)}
+          </span>
+        </span>
       {:else}
         <span class="flex-1 min-w-0 wrap-anywhere text-pretty">{toast.text}</span>
       {/if}

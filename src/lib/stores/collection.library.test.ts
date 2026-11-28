@@ -424,6 +424,37 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(toastStore.messages.filter((m) => m.type === "library")).toEqual([]);
   });
 
+  it("adds up watcher batches that finish close together into one Library changes toast", async () => {
+    await (collectionStore as any).init();
+    vi.useFakeTimers();
+    try {
+      toastStore.messages = [];
+      for (const total_count of [1, 2]) {
+        eventCallbacks["batch-processing-started"]({ payload: { total_count } });
+        eventCallbacks["batch-processing-completed"]({ payload: { total_count } });
+        vi.advanceTimersByTime(1000);
+      }
+      // The live progress toast gives way as each batch completes, and the tracker keeps the row.
+      expect(toastStore.messages).toEqual([]);
+      expect(tasksStore.tasks.find((t) => t.id === "watcher-batch")?.status).toBe("done");
+
+      vi.advanceTimersByTime(1000);
+      expect(toastStore.messages).toEqual([
+        expect.objectContaining({ text: "3 songs updated", type: "library", autoDismisses: true }),
+      ]);
+
+      // Closing the progress toast mid-batch still ends in exactly one summary.
+      toastStore.messages = [];
+      eventCallbacks["batch-processing-started"]({ payload: { total_count: 4 } });
+      toastStore.dismissTask("watcher-batch");
+      eventCallbacks["batch-processing-completed"]({ payload: { total_count: 4 } });
+      vi.advanceTimersByTime(2000);
+      expect(toastStore.messages.map((m) => m.text)).toEqual(["4 songs updated"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("resolves directory display names and scan library names correctly", () => {
     const dirWithNickname = {
       id: 1,

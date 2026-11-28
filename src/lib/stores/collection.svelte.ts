@@ -47,11 +47,24 @@ import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
 import { tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
-import { MAX_RECENT_SEARCHES, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
+import {
+  MAX_RECENT_SEARCHES,
+  MAX_SEARCH_SUGGESTIONS_PER_CATEGORY,
+  TOAST_DURATION_MS,
+} from "../constants";
 import { ALBUM_KEY_SEPARATOR, albumKey, sameAlbum } from "$lib/utils/albumKey";
 import { matchWebDavPath } from "../webdavDisplay";
 
 const libraryToasts = toastStore.channel("library");
+
+const SONGS_ADDED = { summaryKey: "settings.importFinishedToast" };
+
+/** Watcher batches arrive seconds apart while a tagger saves file by file; let them settle. */
+const WATCHER_SONGS_UPDATED = {
+  summaryKey: "settings.batchProcessingDoneToast",
+  durationMs: TOAST_DURATION_MS,
+  settleMs: 2000,
+};
 
 export interface VisibleColumns {
   // Core columns (on by default)
@@ -493,17 +506,16 @@ class CollectionStore {
             // action — the watcher's own batch-processing toast already
             // covers this same filesystem activity, so skip this toast to
             // avoid a second, less-accurate "songs added" notification (#233).
-            if (added > 0 && !event.payload.silent) {
-              const text = i18n.plural("settings.importFinishedToast", added);
-              libraryToasts.show(text, "success");
-            }
-
-            const externalChanges = event.payload.external_changes ?? 0;
-            if (externalChanges > 0 && !event.payload.silent) {
-              const externalText = i18n.plural("collection.externalChangesToast", externalChanges, {
-                name: libraryName,
-              });
-              libraryToasts.show(externalText, "info");
+            if (!event.payload.silent) {
+              libraryToasts.report(SONGS_ADDED, added);
+              libraryToasts.report(
+                {
+                  summaryKey: "collection.externalChangesToast",
+                  vars: { name: libraryName },
+                  variant: "info",
+                },
+                event.payload.external_changes ?? 0,
+              );
             }
 
             // Milestone detection (#182): check if total_songs just crossed a
@@ -569,9 +581,10 @@ class CollectionStore {
       });
 
       // Track file-watcher batches (#233, #1087, #1746) in tasksStore so they stay visible
-      // in the persistent task tracker. Reuses a single task ID so rapid sequential writes
-      // (e.g. Picard saving an album one file at a time) coalesce into one notification row
-      // rather than cascading into a stack of separate toasts.
+      // in the persistent task tracker. Reusing one task ID keeps a single live progress
+      // toast; when a batch completes, its toast gives way to a "N songs updated" report,
+      // so rapid sequential batches (e.g. Picard saving an album one file at a time) add up
+      // into one Library changes notification instead of a stack of completions (#2424).
       const WATCHER_TASK_ID = "watcher-batch";
 
       await this.events.listen<BatchProgress>("batch-processing-started", (event) => {
@@ -598,12 +611,11 @@ class CollectionStore {
 
       await this.events.listen<BatchProgress>("batch-processing-completed", (event) => {
         const { total_count } = event.payload;
-        const text = i18n.plural("settings.batchProcessingDoneToast", total_count);
-        // Micro-batches (1-2 songs, typical of single tag edits or Picard saving
-        // tracks individually) age out quickly (2s) so the notification doesn't linger
-        // across unrelated work; larger batches retain the standard 8s duration.
-        const ageOutMs = total_count <= 2 ? 2000 : undefined;
-        tasksStore.completeTask(WATCHER_TASK_ID, text, ageOutMs);
+        tasksStore.completeQuietly(
+          WATCHER_TASK_ID,
+          i18n.plural("settings.batchProcessingDoneToast", total_count),
+        );
+        libraryToasts.report(WATCHER_SONGS_UPDATED, total_count);
       });
 
       // Track WebDAV synchronization (#682, #1083, #1087)
