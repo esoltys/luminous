@@ -5,13 +5,13 @@
   import {
     SlidersIcon as Sliders,
     FloppyDiskIcon as Save,
-    XIcon as X,
     CircleNotchIcon as LoaderCircle,
     StackIcon as Layers,
     LockIcon as Lock,
     ImageBrokenIcon as ImageOff,
     CloudIcon,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";

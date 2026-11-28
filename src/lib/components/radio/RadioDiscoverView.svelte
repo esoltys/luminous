@@ -1,11 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
-  import {
-    MagnifyingGlassIcon as Search,
-    XIcon as X,
-    BroadcastIcon as Broadcast,
-  } from "phosphor-svelte";
+  import { MagnifyingGlassIcon as Search, BroadcastIcon as Broadcast } from "phosphor-svelte";
+  import X from "../XIcon.svelte";
   import { radioStore } from "../../stores/radio.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import type { RadioDirectoryOrder, RadioDirectoryStation } from "../../types";

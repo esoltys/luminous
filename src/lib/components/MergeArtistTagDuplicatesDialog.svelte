@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { GitMergeIcon as GitMerge, XIcon as X } from "phosphor-svelte";
+  import { GitMergeIcon as GitMerge } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";

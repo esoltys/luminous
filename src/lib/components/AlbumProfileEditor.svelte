@@ -3,7 +3,6 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import {
-    XIcon as X,
     TrashIcon as Trash2,
     GlobeIcon as Globe,
     TagIcon,
@@ -18,6 +17,7 @@
     FolderOpenIcon as FolderOpen,
     PencilSimpleIcon as Pencil,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Plus from "./PlusIcon.svelte";
   import Button from "./Button.svelte";
   import MarkdownEditor from "./MarkdownEditor.svelte";

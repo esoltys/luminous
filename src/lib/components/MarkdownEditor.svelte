@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    XIcon as X,
     ArrowSquareOutIcon as ExternalLink,
     PencilSimpleIcon as Pencil,
     EyeIcon as Eye,
     WarningCircleIcon as Warning,
     ArrowClockwiseIcon as Reload,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Button from "./Button.svelte";
   import MarkdownBio from "./MarkdownBio.svelte";

@@ -40,7 +40,6 @@
     ArrowsClockwiseIcon as RefreshCw,
     ArrowCounterClockwiseIcon as RotateCcw,
     ArrowClockwiseIcon as RotateCw,
-    XIcon as X,
     EraserIcon as Eraser,
     TagIcon as Tag,
     PushPinIcon as Pin,
@@ -49,6 +48,7 @@
     ShareNetworkIcon as Share,
     UsbIcon as Usb,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Plus from "./PlusIcon.svelte";
   import MoreIcon from "./MoreIcon.svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";

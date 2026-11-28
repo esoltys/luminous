@@ -5,7 +5,6 @@
   import {
     SlidersIcon as Sliders,
     FloppyDiskIcon as Save,
-    XIcon as X,
     CircleNotchIcon as LoaderCircle,
     WarningIcon as AlertTriangle,
     LockIcon as Lock,
@@ -15,6 +14,7 @@
     BroomIcon as Broom,
     ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import SongRating from "./SongRating.svelte";

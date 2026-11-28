@@ -6,12 +6,12 @@
     FileTextIcon as FileText,
     PencilSimpleIcon as Edit3,
     FloppyDiskIcon as Save,
-    XIcon as X,
     ArrowsClockwiseIcon as RefreshCw,
     MusicNotesIcon as Music2,
     SubtitlesIcon as Lyrics,
     ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
   import HelpTip from "./HelpTip.svelte";

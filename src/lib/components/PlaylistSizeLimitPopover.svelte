@@ -10,7 +10,7 @@
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import Select from "./Select.svelte";
-  import { XIcon as X } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     isOpen: boolean;

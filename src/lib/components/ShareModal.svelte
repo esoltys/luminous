@@ -4,12 +4,12 @@
   import { invoke } from "@tauri-apps/api/core";
   import { save } from "@tauri-apps/plugin-dialog";
   import {
-    XIcon as X,
     CopySimpleIcon as Copy,
     DownloadSimpleIcon as Download,
     SunIcon as Sun,
     MoonIcon as Moon,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import Toggle from "./Toggle.svelte";

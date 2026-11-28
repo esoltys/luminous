@@ -1,0 +1,10 @@
+id: single-tone-glyphs
+valid:
+  - '<script lang="ts">import Plus from "./PlusIcon.svelte";</script>'
+  - '<script lang="ts">import X from "./XIcon.svelte";</script>'
+  - '<script lang="ts">import { PlayIcon, ListPlusIcon, XCircleIcon, FunnelXIcon } from "phosphor-svelte";</script>'
+invalid:
+  - '<script lang="ts">import { PlusIcon as Plus } from "phosphor-svelte";</script>'
+  - '<script lang="ts">import { CaretDownIcon, MinusIcon, WarningIcon } from "phosphor-svelte";</script>'
+  - '<script lang="ts">import { XIcon as X } from "phosphor-svelte";</script>'
+  - '<script lang="ts">import { DotsThreeIcon } from "phosphor-svelte";</script>'

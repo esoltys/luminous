@@ -1,7 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { BroomIcon as Broom, WarningIcon as AlertTriangle, XIcon as X } from "phosphor-svelte";
+  import { BroomIcon as Broom, WarningIcon as AlertTriangle } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";

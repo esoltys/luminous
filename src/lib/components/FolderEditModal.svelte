@@ -11,7 +11,8 @@
   import LibraryBadge from "./LibraryBadge.svelte";
   import ColorPicker from "./ColorPicker.svelte";
   import { BADGE_ICON_CHOICES, BADGE_COLOR_CHOICES } from "../badgeChoices";
-  import { XIcon as X, FolderSimpleIcon as FolderSimple } from "phosphor-svelte";
+  import { FolderSimpleIcon as FolderSimple } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
 
   interface Props {
     directory: MusicDirectory;

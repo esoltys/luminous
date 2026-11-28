@@ -2,9 +2,9 @@
   import {
     ArrowRightIcon as ArrowRight,
     TrashIcon as Trash2,
-    XIcon as X,
     GitMergeIcon as GitMerge,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";

@@ -1,10 +1,6 @@
 <script lang="ts">
-  import {
-    ListPlusIcon as ListPlus,
-    RadioIcon as Radio,
-    PlaylistIcon,
-    XIcon as X,
-  } from "phosphor-svelte";
+  import { ListPlusIcon as ListPlus, RadioIcon as Radio, PlaylistIcon } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Plus from "./PlusIcon.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";

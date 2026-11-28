@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { KeyboardIcon as Keyboard, XIcon as X } from "phosphor-svelte";
+  import { KeyboardIcon as Keyboard } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import Modal from "./Modal.svelte";
   import { i18n } from "../stores/i18n.svelte";
 

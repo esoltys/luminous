@@ -11,9 +11,9 @@
     PlaylistIcon as ListMusic,
     MusicNotesIcon as Music,
     ClockCounterClockwiseIcon as History,
-    XIcon as X,
     SparkleIcon as Sparkles,
   } from "phosphor-svelte";
+  import X from "./XIcon.svelte";
   import { parseSearchRules, hasAdvancedSearchTerms } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
