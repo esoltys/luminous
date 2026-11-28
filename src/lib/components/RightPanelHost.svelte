@@ -236,9 +236,6 @@
 {/if}
 
 {#if showOverlay}
-  <!-- Acrylic on the overlay itself, not on anything inside it: fly fades this element's
-       opacity, which would cut a descendant's backdrop-filter off from the page for the
-       length of the slide. -->
   <div
     bind:this={overlayEl}
     transition:fly={{
@@ -247,7 +244,7 @@
       easing: cubicOut,
     }}
     role="presentation"
-    class="absolute right-0 top-0 bottom-0 z-40 flex shadow-2xl acrylic-float"
+    class="absolute right-0 top-0 bottom-0 z-40 flex shadow-2xl float-surface"
     onpointerenter={cancelTimer}
     onpointerleave={onOverlayLeave}
   >

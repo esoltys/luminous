@@ -2031,7 +2031,6 @@ export const frFR: DeepStringRecord<typeof en> = {
     },
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
-    saving: "Enregistrement des balises de l'album...",
     saveSuccess: {
       one: "Balises d'album mises à jour pour {count} chanson",
       other: "Balises d'album mises à jour pour {count} chansons",

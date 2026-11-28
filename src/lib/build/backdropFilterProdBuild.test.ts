@@ -80,7 +80,7 @@ describe("production CSS build: backdrop-filter survives minification", () => {
     expect(builtCss.length).toBeGreaterThan(0);
   }, 30_000);
 
-  for (const selector of [".glass-surface", ".acrylic-chrome", ".acrylic-float", ".acrylic-scrim"]) {
+  for (const selector of [".glass-surface", ".acrylic-chrome"]) {
     it(`keeps both -webkit-backdrop-filter and backdrop-filter on ${selector} after minification`, () => {
       // Match every minified rule block for this selector — Tailwind/Vite may
       // emit more than one block per selector (e.g. an override rule later in
@@ -108,6 +108,24 @@ describe("production CSS build: backdrop-filter survives minification", () => {
           /(?<!-webkit-)backdrop-filter:/.test(rule),
           `${selector} rule dropped the standard backdrop-filter: ${rule}`
         ).toBe(true);
+      }
+    });
+  }
+
+  // Surfaces that open over content stay unblurred: WebView2 re-blurs a
+  // backdrop-filter every frame anything under or over it animates (the
+  // playing player bar's visualizer, a spinner), which cost ~23% GPU behind
+  // a modal during playback (#2427). See the acrylic notes in app.css.
+  for (const selector of [".float-surface", ".modal-scrim"]) {
+    it(`declares no backdrop-filter on ${selector}`, () => {
+      const ruleRegex = new RegExp(
+        selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[^{]*\\{[^}]*\\}",
+        "g"
+      );
+      const rules = builtCss.match(ruleRegex);
+      expect(rules, `expected at least one minified rule for ${selector}`).toBeTruthy();
+      for (const rule of rules ?? []) {
+        expect(rule, `${selector} must stay unblurred: ${rule}`).not.toContain("backdrop-filter");
       }
     });
   }

@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
 import { invoke } from "@tauri-apps/api/core";
-import { collectionStore } from "../stores/collection.svelte";
+import { ALBUM_TAG_SAVE_TASK_ID, collectionStore } from "../stores/collection.svelte";
+import { tasksStore } from "../stores/tasks.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -14,6 +15,7 @@ describe("AlbumProfileEditor.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     collectionStore.songs = [];
+    tasksStore.tasks = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "open_song_folder") return null;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
@@ -208,5 +210,21 @@ describe("AlbumProfileEditor.svelte", () => {
         }),
       });
     });
+  });
+
+  it("won't save album tags while another batch tag save is still running", async () => {
+    tasksStore.startTask({ id: ALBUM_TAG_SAVE_TASK_ID, label: "Saving tags…", total: 20 });
+    const { getByRole } = render(AlbumProfileEditor, {
+      albumName: "Album",
+      artistName: "Artist",
+      songIds: [1],
+      initialTracks: [{ id: 1, path: "/m/a.flac", title: "A", album: "Album" } as Song],
+      onClose: vi.fn(),
+    });
+
+    const save = getByRole("button", { name: /^save$/i });
+    expect(save).toBeDisabled();
+    await fireEvent.click(save);
+    expect(invoke).not.toHaveBeenCalledWith("save_album_tags", expect.anything());
   });
 });

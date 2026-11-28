@@ -783,7 +783,7 @@
     <div class="flex-1 flex flex-col min-h-0 relative z-10 overflow-hidden">
       <div
         data-testid="playlist-header"
-        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
+        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--surface-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
           ? 'py-3'
           : 'pt-6 pb-6'} shrink-0"
       >
@@ -1100,7 +1100,7 @@
     {#if selectedUuids.size > 0}
       <div
         data-floating-toolbar="true"
-        class="absolute left-1/2 -translate-x-1/2 bottom-dock z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold"
+        class="absolute left-1/2 -translate-x-1/2 bottom-dock z-40 float-surface border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold"
       >
         <span class="text-brand-accent-text font-bold">
           {i18n.t("playlists.selectedCount", { count: selectedUuids.size })}
@@ -1403,7 +1403,7 @@
 {#if showExportOptionsModal}
   <div
     use:portal
-    class="fixed inset-0 z-50 flex items-center justify-center acrylic-scrim select-none"
+    class="fixed inset-0 z-50 flex items-center justify-center modal-scrim select-none"
   >
     <div
       class="bg-brand-sidebar border border-brand-border rounded-xl p-5 w-96 shadow-2xl space-y-4"
