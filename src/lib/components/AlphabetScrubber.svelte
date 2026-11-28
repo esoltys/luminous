@@ -112,7 +112,7 @@
     <!-- Floating active letter bubble -->
     {#if activeLetter && bubbleY !== null}
       <div
-        class="absolute right-7 -translate-y-1/2 w-9 h-9 rounded-full bg-brand-accent text-brand-surface font-bold text-sm flex items-center justify-center shadow-lg pointer-events-none z-30 transition-all duration-75"
+        class="absolute right-7 -translate-y-1/2 w-9 h-9 rounded-full bg-brand-accent text-brand-accent-contrast font-bold text-sm flex items-center justify-center shadow-lg pointer-events-none z-30 transition-all duration-75"
         style="top: {bubbleY}px;"
         data-testid="alphabet-scrubber-bubble"
       >

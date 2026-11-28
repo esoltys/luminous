@@ -137,7 +137,7 @@
       <div
         data-testid="radio-offline-banner"
         role="alert"
-        class="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-brand-border bg-brand-surface text-xs text-brand-text-primary shrink-0"
+        class="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-brand-border bg-brand-sidebar text-xs text-brand-text-primary shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0">
           <AlertCircle class="w-4 h-4 shrink-0 text-brand-text-secondary" />

@@ -140,7 +140,7 @@
       type="button"
       onclick={onClose}
       aria-label={i18n.t("common.close")}
-      class="p-1 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-surface transition-colors"
+      class="p-1 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main transition-colors"
     >
       <X class="w-4 h-4" />
     </button>
@@ -151,7 +151,7 @@
       <div
         role="alert"
         data-testid="add-station-error"
-        class="flex items-start gap-2 px-3 py-2 rounded-lg border border-brand-border bg-brand-surface text-xs text-brand-text-primary"
+        class="flex items-start gap-2 px-3 py-2 rounded-lg border border-brand-border bg-brand-main text-xs text-brand-text-primary"
       >
         <AlertCircle class="w-4 h-4 shrink-0 text-brand-accent-text mt-0.5" />
         <span>{error}</span>
@@ -180,7 +180,7 @@
         required
         disabled={isReadOnly}
         placeholder={i18n.t("radio.stationNamePlaceholder")}
-        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
+        class="w-full px-3 py-2 rounded-lg bg-brand-main border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
       />
     </div>
 
@@ -200,14 +200,14 @@
           required
           disabled={isReadOnly}
           placeholder="https://example.com/stream.mp3"
-          class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
+          class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-main border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="button"
           disabled={!canTestConnection}
           onclick={() => void handleTestConnection()}
           data-testid="test-station-connection"
-          class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-surface disabled:opacity-50 transition-colors"
+          class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main disabled:opacity-50 transition-colors"
         >
           <PlugsConnected class="w-3.5 h-3.5" />
           <span>
@@ -248,7 +248,7 @@
         bind:value={tags}
         disabled={isReadOnly}
         placeholder={i18n.t("radio.stationTagsPlaceholder")}
-        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
+        class="w-full px-3 py-2 rounded-lg bg-brand-main border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
       />
     </div>
 
@@ -273,7 +273,7 @@
           disabled={submitting}
           onclick={() => void handleImportFile()}
           data-testid="add-station-import-file"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-surface disabled:opacity-50 transition-colors"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main disabled:opacity-50 transition-colors"
         >
           <FileUp class="w-3.5 h-3.5" />
           <span>{i18n.t("radio.importStationFileBtn")}</span>
@@ -286,7 +286,7 @@
         <button
           type="button"
           onclick={onClose}
-          class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-surface transition-colors"
+          class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main transition-colors"
         >
           {isReadOnly ? i18n.t("common.close") : i18n.t("common.cancel")}
         </button>

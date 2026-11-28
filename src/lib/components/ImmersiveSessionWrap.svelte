@@ -101,7 +101,7 @@
     <button
       type="button"
       onclick={handleReplay}
-      class="px-5 py-2.5 sm:px-6 sm:py-3 rounded-full bg-brand-surface/90 hover:bg-brand-surface border border-brand-border/80 hover:border-brand-text-secondary/40 text-brand-text-primary font-semibold flex items-center gap-2.5 shadow-sm hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-accent focus:outline-none"
+      class="px-5 py-2.5 sm:px-6 sm:py-3 rounded-full bg-brand-sidebar/90 hover:bg-brand-sidebar border border-brand-border/80 hover:border-brand-text-secondary/40 text-brand-text-primary font-semibold flex items-center gap-2.5 shadow-sm hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-accent focus:outline-none"
     >
       <RotateCcw class="w-4 h-4 sm:w-5 sm:h-5" weight="bold" />
       <span>{i18n.t("immersive.replay", {}, "Replay")}</span>
@@ -111,7 +111,7 @@
     <button
       type="button"
       onclick={handleExit}
-      class="px-4 py-2.5 sm:px-5 sm:py-3 rounded-full bg-brand-surface/40 hover:bg-brand-surface/80 border border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary font-medium flex items-center gap-2 hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-accent focus:outline-none"
+      class="px-4 py-2.5 sm:px-5 sm:py-3 rounded-full bg-brand-sidebar/40 hover:bg-brand-sidebar/80 border border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary font-medium flex items-center gap-2 hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-accent focus:outline-none"
     >
       <Minimize2 class="w-4 h-4" weight="bold" />
       <span>{i18n.t("immersive.exitImmersive", {}, "Exit Immersive")}</span>
