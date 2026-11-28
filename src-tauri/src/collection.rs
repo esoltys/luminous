@@ -1516,7 +1516,7 @@ impl CollectionScanner {
         });
 
         let discovery_started = Instant::now();
-        let mut all_paths: Vec<PathBuf> = Vec::new();
+        let mut discovered_files: Vec<DiscoveredFile> = Vec::new();
         let mut cue_paths: Vec<PathBuf> = Vec::new();
         let mut dr_log_paths: HashMap<PathBuf, PathBuf> = HashMap::new();
         let mut folder_art_by_dir: HashMap<PathBuf, PathBuf> = HashMap::new();
@@ -1527,7 +1527,7 @@ impl CollectionScanner {
             let dir_name = directory_display_name(dir);
             on_progress(ScanProgress {
                 phase: ScanPhase::Discovering,
-                scanned: all_paths.len() as u64,
+                scanned: discovered_files.len() as u64,
                 total: 0,
                 current_path: Some(dir.path.clone()),
                 silent,
@@ -1549,7 +1549,18 @@ impl CollectionScanner {
                 }
                 let path = entry.path();
                 if is_audio_file(path) {
-                    all_paths.push(path.to_path_buf());
+                    // On Windows/SMB, `DirEntry::metadata()` reads the `WIN32_FIND_DATA`
+                    // already returned by `FindFirstFile`/`FindNextFile` with zero extra
+                    // network round-trips; capturing `FileStamp` here avoids thousands of
+                    // per-file `stat()` calls in the partition phase (#2421).
+                    let stamp = entry
+                        .metadata()
+                        .ok()
+                        .map(|m| FileStamp::cacheable_from_metadata(&m));
+                    discovered_files.push(DiscoveredFile {
+                        path: path.to_path_buf(),
+                        stamp,
+                    });
                 } else if is_cue_file(path) {
                     cue_paths.push(path.to_path_buf());
                 } else if crate::playlist::file_sync::is_playlist_file(path) {
@@ -1579,20 +1590,22 @@ impl CollectionScanner {
         // audio files just discovered, and claim their referenced media file
         // so its standalone whole-file row is suppressed below in favor of
         // one row per CUE track (see `sync_cue_tracks`).
+        let mut all_paths: Vec<PathBuf> = discovered_files.iter().map(|f| f.path.clone()).collect();
         let cue_jobs = resolve_cue_jobs(&cue_paths, &all_paths);
         if !cue_jobs.is_empty() {
-            let claimed: std::collections::HashSet<&PathBuf> =
-                cue_jobs.iter().map(|j| &j.media_path).collect();
+            let claimed: std::collections::HashSet<PathBuf> =
+                cue_jobs.iter().map(|j| j.media_path.clone()).collect();
+            discovered_files.retain(|f| !claimed.contains(&f.path));
             all_paths.retain(|p| !claimed.contains(p));
         }
 
-        let total = (all_paths.len() + cue_jobs.len()) as u64;
+        let total = (discovered_files.len() + cue_jobs.len()) as u64;
         report.discovery_ms = discovery_started.elapsed().as_millis();
-        report.files_found = all_paths.len();
+        report.files_found = discovered_files.len();
         report.cue_sheets = cue_jobs.len();
         log::info!(
             "Scan found {total} audio track source(s) ({} plain file(s), {} CUE sheet(s)) (force={force})",
-            all_paths.len(),
+            discovered_files.len(),
             cue_jobs.len()
         );
 
@@ -1688,25 +1701,39 @@ impl CollectionScanner {
             // decoded `Song`s are held in memory at once.
             let stat_started = Instant::now();
 
-            // Stat file stamps in parallel before partitioning so network
-            // shares, NAS, and spinning disks don't pay O(files) serial stat
-            // latency (#2353).
-            let mut needs_update: Vec<&PathBuf> = Vec::new();
+            // Reuse the `FileStamp` captured during `WalkDir` discovery whenever
+            // `DirEntry::metadata()` succeeded, only falling back to parallel
+            // `stat()` for entries whose metadata wasn't available during walk
+            // (#2353, #2421).
+            let mut needs_update: Vec<&DiscoveredFile> = Vec::new();
             if force {
-                needs_update.extend(all_paths.iter());
+                needs_update.extend(discovered_files.iter());
             } else {
-                let disk_stamps: Vec<Option<FileStamp>> = scan_pool.install(|| {
-                    all_paths
-                        .par_iter()
-                        .map(|p| FileStamp::cacheable_from_path(p))
-                        .collect()
-                });
-                for (path, disk_stamp) in all_paths.iter().zip(disk_stamps) {
-                    let path_str = path.to_string_lossy();
+                let needs_fallback_stat = discovered_files.iter().any(|f| f.stamp.is_none());
+                let fallback_stamps: Vec<Option<FileStamp>> = if needs_fallback_stat {
+                    scan_pool.install(|| {
+                        discovered_files
+                            .par_iter()
+                            .map(|f| match f.stamp {
+                                Some(stamp) => stamp,
+                                None => FileStamp::cacheable_from_path(&f.path),
+                            })
+                            .collect()
+                    })
+                } else {
+                    Vec::new()
+                };
+
+                for (idx, file) in discovered_files.iter().enumerate() {
+                    let disk_stamp = match file.stamp {
+                        Some(stamp) => stamp,
+                        None => fallback_stamps[idx],
+                    };
+                    let path_str = file.path.to_string_lossy();
                     if FileStamp::is_unchanged(known_stamps.get(path_str.as_ref()), disk_stamp) {
                         scanned += 1;
                         if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
-                            let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
+                            let (dir_id, dir_name) = resolve_path_directory(&file.path, &dirs);
                             on_progress(ScanProgress {
                                 phase: ScanPhase::ReadingTags,
                                 scanned,
@@ -1720,7 +1747,7 @@ impl CollectionScanner {
                         }
                         continue;
                     }
-                    needs_update.push(path);
+                    needs_update.push(file);
                 }
             }
             report.partition_stat_ms = stat_started.elapsed().as_millis();
@@ -1744,8 +1771,16 @@ impl CollectionScanner {
                     let prepared: Vec<(PathBuf, Result<Song>)> = scan_pool.install(|| {
                         read_chunk
                             .par_iter()
-                            .map(|path| {
-                                ((*path).clone(), read_and_prepare_song(&cover_manager, path))
+                            .map(|file| {
+                                (
+                                    file.path.clone(),
+                                    read_and_prepare_song_with(
+                                        &cover_manager,
+                                        &file.path,
+                                        file.stamp.flatten(),
+                                        Some(&folder_art_by_dir),
+                                    ),
+                                )
                             })
                             .collect()
                     });
@@ -2194,6 +2229,15 @@ pub(crate) fn cacheable_mtime(path: &Path) -> Option<i64> {
     get_mtime(path).filter(|&t| t > 0)
 }
 
+/// Audio file discovered during `WalkDir`, paired with the `FileStamp`
+/// extracted from `DirEntry::metadata()` when available (`None` means the
+/// metadata call itself failed; `Some(None)` means it succeeded with an
+/// untrustworthy epoch-zero mtime).
+struct DiscoveredFile {
+    path: PathBuf,
+    stamp: Option<Option<FileStamp>>,
+}
+
 /// On-disk identity of an audio file used by the scanner's unchanged check.
 /// Both `mtime` (whole Unix seconds) and `filesize` (bytes) must match when
 /// `filesize` is known; legacy rows with `filesize: None` fall back to
@@ -2205,13 +2249,23 @@ struct FileStamp {
 }
 
 impl FileStamp {
-    fn from_path(path: &Path) -> Option<Self> {
-        let meta = std::fs::metadata(path).ok()?;
-        let mtime = mtime_from_metadata(&meta)?;
+    fn from_metadata(meta: &std::fs::Metadata) -> Option<Self> {
+        let mtime = mtime_from_metadata(meta)?;
         Some(Self {
             mtime,
             filesize: Some(meta.len() as i64),
         })
+    }
+
+    /// Returns a stamp from `meta` only when its mtime is trustworthy for
+    /// skipping re-reads (see [`cacheable_mtime`], #2351).
+    fn cacheable_from_metadata(meta: &std::fs::Metadata) -> Option<Self> {
+        Self::from_metadata(meta).filter(|s| s.mtime > 0)
+    }
+
+    fn from_path(path: &Path) -> Option<Self> {
+        let meta = std::fs::metadata(path).ok()?;
+        Self::from_metadata(&meta)
     }
 
     /// Returns `path`'s stamp only when its mtime is trustworthy for skipping
@@ -2327,10 +2381,14 @@ pub(crate) fn read_embedded_lyrics_from_path(path: &Path) -> Option<String> {
 }
 
 pub(crate) fn read_tags(path: &Path) -> Result<Song> {
+    read_tags_with_stamp(path, None)
+}
+
+fn read_tags_with_stamp(path: &Path, discovered_stamp: Option<FileStamp>) -> Result<Song> {
     let meta = luminous_metadata::audio::read_tags(path)?;
 
     let path_str = path.to_string_lossy().to_string();
-    let stamp = FileStamp::from_path(path);
+    let stamp = discovered_stamp.or_else(|| FileStamp::from_path(path));
     let mtime = stamp.map(|s| s.mtime);
     let filesize = stamp.and_then(|s| s.filesize);
     let filetype = filetype_for(path, meta.properties.codec);
@@ -2504,13 +2562,25 @@ pub fn reprobe_codecs_and_announce(app: &AppHandle, db: &Database) {
 /// tag-reading work can be run in parallel across a thread pool while DB
 /// writes stay serialized on one connection (see `scan_all` phase 2).
 pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -> Result<Song> {
-    let mut song = read_tags(path)?;
+    read_and_prepare_song_with(cover_manager, path, None, None)
+}
+
+/// Like [`read_and_prepare_song`], but reuses the `FileStamp` and folder-art
+/// map already collected during `WalkDir` discovery so scans don't re-stat or
+/// re-list parent directories for every updated track (#2421).
+fn read_and_prepare_song_with(
+    cover_manager: &CoverManager,
+    path: &Path,
+    discovered_stamp: Option<FileStamp>,
+    folder_art_by_dir: Option<&HashMap<PathBuf, PathBuf>>,
+) -> Result<Song> {
+    let mut song = read_tags_with_stamp(path, discovered_stamp)?;
 
     // Folder art before embedded art for album tracks — see the
     // `covermanager` module docs for the order and the singles exception.
     let has_album = song.album.as_deref().is_some_and(|a| !a.trim().is_empty());
     if has_album {
-        use_folder_art(cover_manager, path, &mut song);
+        use_folder_art_with(cover_manager, path, &mut song, folder_art_by_dir);
     }
 
     if song.art_automatic.is_none() && song.art_embedded {
@@ -2536,14 +2606,23 @@ pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -
     }
 
     if song.art_automatic.is_none() && !has_album {
-        use_folder_art(cover_manager, path, &mut song);
+        use_folder_art_with(cover_manager, path, &mut song, folder_art_by_dir);
     }
 
     Ok(song)
 }
 
-fn use_folder_art(cover_manager: &CoverManager, path: &Path, song: &mut Song) {
-    if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+fn use_folder_art_with(
+    cover_manager: &CoverManager,
+    path: &Path,
+    song: &mut Song,
+    folder_art_by_dir: Option<&HashMap<PathBuf, PathBuf>>,
+) {
+    let found = match folder_art_by_dir {
+        Some(map) => CoverManager::resolve_discovered_folder_art(path, map).cloned(),
+        None => cover_manager.scan_folder_art(path),
+    };
+    if let Some(folder_art_path) = found {
         song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
         song.art_unset = false;
     }
@@ -6088,6 +6167,69 @@ Official DR value: DR11\n",
         assert!(
             missing.contains(&orphan_local_id),
             "local file outside watched folders should still be flagged as orphaned"
+        );
+    }
+
+    #[test]
+    fn test_file_stamp_from_walkdir_metadata_matches_path_and_rejects_epoch_zero() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("track.flac");
+        std::fs::write(&file_path, b"dummy audio bytes").unwrap();
+
+        let entry = WalkDir::new(temp_dir.path())
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .find(|e| e.path() == file_path)
+            .expect("WalkDir should find track.flac");
+        let walk_meta = entry.metadata().unwrap();
+
+        let from_walk = FileStamp::cacheable_from_metadata(&walk_meta);
+        let from_path = FileStamp::cacheable_from_path(&file_path);
+        assert!(from_walk.is_some());
+        assert_eq!(from_walk, from_path);
+
+        // Epoch-zero mtime must be rejected by cacheable_from_metadata too (#2351).
+        let file = std::fs::File::options()
+            .write(true)
+            .open(&file_path)
+            .unwrap();
+        file.set_modified(UNIX_EPOCH).unwrap();
+        drop(file);
+        let zero_meta = std::fs::metadata(&file_path).unwrap();
+        assert_eq!(FileStamp::cacheable_from_metadata(&zero_meta), None);
+    }
+
+    #[test]
+    fn test_read_and_prepare_song_with_reuses_discovered_stamp_and_folder_art() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("track.wav");
+        let folder_art_path = temp_dir.path().join("cover.jpg");
+        write_test_wav_with_embedded_art(&audio_path, Some("Album"));
+        std::fs::write(&folder_art_path, b"JPEG image content").unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let cover_manager = CoverManager::new(db, temp_dir.path().to_path_buf());
+
+        let synthetic_stamp = FileStamp {
+            mtime: 1_700_000_123,
+            filesize: Some(999),
+        };
+        let mut folder_art_by_dir = HashMap::new();
+        folder_art_by_dir.insert(temp_dir.path().to_path_buf(), folder_art_path.clone());
+
+        let song = read_and_prepare_song_with(
+            &cover_manager,
+            &audio_path,
+            Some(synthetic_stamp),
+            Some(&folder_art_by_dir),
+        )
+        .unwrap();
+
+        assert_eq!(song.mtime, Some(1_700_000_123));
+        assert_eq!(song.filesize, Some(999));
+        assert_eq!(
+            song.art_automatic.as_deref(),
+            Some(folder_art_path.to_string_lossy().as_ref())
         );
     }
 }
