@@ -1553,10 +1553,13 @@ impl CollectionScanner {
                     // already returned by `FindFirstFile`/`FindNextFile` with zero extra
                     // network round-trips; capturing `FileStamp` here avoids thousands of
                     // per-file `stat()` calls in the partition phase (#2421).
-                    let stamp = entry
-                        .metadata()
-                        .ok()
-                        .map(|m| FileStamp::cacheable_from_metadata(&m));
+                    let stamp = match entry.metadata() {
+                        Ok(meta) => match FileStamp::cacheable_from_metadata(&meta) {
+                            Some(s) => DiscoveredStamp::Valid(s),
+                            None => DiscoveredStamp::Untrustworthy,
+                        },
+                        Err(_) => DiscoveredStamp::Unavailable,
+                    };
                     discovered_files.push(DiscoveredFile {
                         path: path.to_path_buf(),
                         stamp,
@@ -1709,14 +1712,19 @@ impl CollectionScanner {
             if force {
                 needs_update.extend(discovered_files.iter());
             } else {
-                let needs_fallback_stat = discovered_files.iter().any(|f| f.stamp.is_none());
+                let needs_fallback_stat = discovered_files
+                    .iter()
+                    .any(|f| f.stamp == DiscoveredStamp::Unavailable);
                 let fallback_stamps: Vec<Option<FileStamp>> = if needs_fallback_stat {
                     scan_pool.install(|| {
                         discovered_files
                             .par_iter()
                             .map(|f| match f.stamp {
-                                Some(stamp) => stamp,
-                                None => FileStamp::cacheable_from_path(&f.path),
+                                DiscoveredStamp::Valid(s) => Some(s),
+                                DiscoveredStamp::Untrustworthy => None,
+                                DiscoveredStamp::Unavailable => {
+                                    FileStamp::cacheable_from_path(&f.path)
+                                }
                             })
                             .collect()
                     })
@@ -1726,8 +1734,9 @@ impl CollectionScanner {
 
                 for (idx, file) in discovered_files.iter().enumerate() {
                     let disk_stamp = match file.stamp {
-                        Some(stamp) => stamp,
-                        None => fallback_stamps[idx],
+                        DiscoveredStamp::Valid(s) => Some(s),
+                        DiscoveredStamp::Untrustworthy => None,
+                        DiscoveredStamp::Unavailable => fallback_stamps[idx],
                     };
                     let path_str = file.path.to_string_lossy();
                     if FileStamp::is_unchanged(known_stamps.get(path_str.as_ref()), disk_stamp) {
@@ -1777,7 +1786,7 @@ impl CollectionScanner {
                                     read_and_prepare_song_with(
                                         &cover_manager,
                                         &file.path,
-                                        file.stamp.flatten(),
+                                        file.stamp.valid(),
                                         Some(&folder_art_by_dir),
                                     ),
                                 )
@@ -2229,13 +2238,32 @@ pub(crate) fn cacheable_mtime(path: &Path) -> Option<i64> {
     get_mtime(path).filter(|&t| t > 0)
 }
 
+/// Result of reading a file's `FileStamp` from `DirEntry::metadata()` during
+/// `WalkDir` discovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DiscoveredStamp {
+    /// `DirEntry::metadata()` succeeded with a trustworthy mtime (> 0).
+    Valid(FileStamp),
+    /// `DirEntry::metadata()` succeeded, but mtime was <= 0 (epoch-zero, #2351).
+    Untrustworthy,
+    /// `DirEntry::metadata()` itself failed; fall back to `FileStamp::cacheable_from_path`.
+    Unavailable,
+}
+
+impl DiscoveredStamp {
+    fn valid(self) -> Option<FileStamp> {
+        match self {
+            Self::Valid(s) => Some(s),
+            Self::Untrustworthy | Self::Unavailable => None,
+        }
+    }
+}
+
 /// Audio file discovered during `WalkDir`, paired with the `FileStamp`
-/// extracted from `DirEntry::metadata()` when available (`None` means the
-/// metadata call itself failed; `Some(None)` means it succeeded with an
-/// untrustworthy epoch-zero mtime).
+/// extracted from `DirEntry::metadata()` when available.
 struct DiscoveredFile {
     path: PathBuf,
-    stamp: Option<Option<FileStamp>>,
+    stamp: DiscoveredStamp,
 }
 
 /// On-disk identity of an audio file used by the scanner's unchanged check.
