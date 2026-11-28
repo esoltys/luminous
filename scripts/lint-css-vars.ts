@@ -16,6 +16,12 @@
 // `…-(--x)` class shorthand. A `var(--prefix-${…})` template read passes if
 // any writer starts with that prefix.
 //
+// Theme-colour classes: `bg-brand-main` reads --color-brand-main too, and an
+// unknown name fails the same silent way, except Tailwind emits no rule at all
+// (#2442). Those reads must name a token in an @theme block: a --color-brand-*
+// written only at runtime (setProperty) defines no utility, so the general
+// writer set doesn't count for them.
+//
 // Usage: bun run scripts/lint-css-vars.ts [--unused]
 //   --unused also lists (without failing) properties written but never read,
 //   and fallback-guarded reads whose name is written nowhere — a typo hidden
@@ -82,6 +88,31 @@ function collectWriters(text: string, into: Set<string>) {
   for (const m of text.matchAll(/setProperty\(\s*["'`](--[\w-]+)["'`]/g)) into.add(m[1]);
 }
 
+/**
+ * A colour utility naming a `brand-*` theme colour, with any variant prefix
+ * (`hover:`, `group-hover:`) and opacity suffix (`/40`) around it. The name
+ * is matched whole, so `accent-text-hover` is never read as `accent`.
+ */
+const BRAND_COLOUR_CLASS =
+  /(?<![\w-])(?:bg|text|border(?:-[trblxyse])?|ring(?:-offset)?|outline|fill|stroke|shadow|from|via|to|divide|decoration|accent|caret|placeholder)-(brand-[a-z](?:[a-z-]*[a-z])?)(?![\w-])/g;
+
+function collectThemeColourReads(text: string, file: string, into: Read[]) {
+  const rel = path.relative(ROOT, file).replaceAll("\\", "/");
+  for (const m of text.matchAll(BRAND_COLOUR_CLASS)) {
+    into.push({
+      name: `--color-${m[1]}`,
+      file: rel,
+      line: lineOf(text, m.index),
+      isPrefix: false,
+      hasFallback: false,
+    });
+  }
+}
+
+function collectThemeTokens(text: string, into: Set<string>) {
+  for (const block of text.matchAll(/@theme[^{]*\{([^}]*)\}/g)) collectWriters(block[1], into);
+}
+
 function collectReads(text: string, file: string, into: Read[]) {
   const rel = path.relative(ROOT, file).replaceAll("\\", "/");
   for (const m of text.matchAll(/var\(\s*(--[\w-]+)(\$\{)?\s*(,)?/g)) {
@@ -109,6 +140,8 @@ function main() {
   const reportUnused = process.argv.includes("--unused");
   const writers = new Set<string>();
   const reads: Read[] = [];
+  const themeTokens = new Set<string>();
+  const themeColourReads: Read[] = [];
 
   collectWriters(stripComments(readFileSync(TAILWIND_THEME, "utf8"), TAILWIND_THEME), writers);
   const files = walk(SRC);
@@ -116,6 +149,8 @@ function main() {
     const text = stripComments(readFileSync(file, "utf8"), file);
     collectWriters(text, writers);
     collectReads(text, file, reads);
+    collectThemeTokens(text, themeTokens);
+    collectThemeColourReads(text, file, themeColourReads);
   }
 
   const isWritten = (read: Read) =>
@@ -123,18 +158,14 @@ function main() {
     (read.isPrefix ? [...writers].some((w) => w.startsWith(read.name)) : writers.has(read.name));
 
   const broken = reads.filter((r) => !r.hasFallback && !isWritten(r));
+  const brokenClasses = themeColourReads.filter((r) => !themeTokens.has(r.name));
 
   if (reportUnused) {
     // @theme tokens are read by the utilities Tailwind generates from them
     // (--color-brand-main → bg-brand-main), not by var(), so they don't count.
     const ownWriters = new Set<string>();
-    const themeTokens = new Set<string>();
-    for (const file of files) {
-      const text = stripComments(readFileSync(file, "utf8"), file);
-      collectWriters(text, ownWriters);
-      for (const block of text.matchAll(/@theme[^{]*\{([^}]*)\}/g))
-        collectWriters(block[1], themeTokens);
-    }
+    for (const file of files)
+      collectWriters(stripComments(readFileSync(file, "utf8"), file), ownWriters);
     const unread = [...ownWriters].filter(
       (w) =>
         !themeTokens.has(w) &&
@@ -150,6 +181,16 @@ function main() {
     console.log();
   }
 
+  if (brokenClasses.length > 0) {
+    console.error(
+      `✖ ${brokenClasses.length} theme-colour class${brokenClasses.length === 1 ? " names" : "es name"} a colour no @theme block defines:`,
+    );
+    for (const r of brokenClasses)
+      console.error(`  ${r.file}:${r.line}  ${r.name.replace(/^--color-/, "")}`);
+    console.error(
+      "\nTailwind emits no rule for an unknown theme colour, so the element is left transparent. Use a --color-brand-* token from src/app.css.\n",
+    );
+  }
   if (broken.length > 0) {
     console.error(
       `✖ ${broken.length} custom propert${broken.length === 1 ? "y is" : "ies are"} read with no fallback and never defined:`,
@@ -159,10 +200,10 @@ function main() {
     console.error(
       "\nAn undefined var() computes to `unset` (transparent/missing) with no error. Define it, add a fallback, or fix the name.",
     );
-    process.exit(1);
   }
+  if (broken.length > 0 || brokenClasses.length > 0) process.exit(1);
   console.log(
-    `✔ CSS custom properties: ${reads.length} reads across ${files.length} files, all defined or guarded by a fallback.`,
+    `✔ CSS custom properties: ${reads.length} reads and ${themeColourReads.length} theme-colour classes across ${files.length} files, all defined or guarded by a fallback.`,
   );
 }
 
