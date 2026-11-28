@@ -30,12 +30,10 @@ const GENRE_ONLY_SPAN: f64 = 0.45;
 const DECADE_MULTIPLIER: f64 = 1.25;
 const BPM_MAX_BONUS: f64 = 0.25;
 
-/// The scoring constants a caller tunes.
+/// The scoring constants a caller tunes. How many songs one artist may have
+/// is not among them: `pick` derives that from `MixOptions::limit`.
 #[derive(Debug, Clone, Copy)]
 pub struct Tuning {
-    /// At most this many picked songs per artist (`artist_key`), the lead
-    /// song included.
-    pub max_per_artist: usize,
     /// BPM difference at which the tempo multiplier drops to 1.0.
     pub bpm_window: f32,
     /// Transitional multiplier boost by star rating / loved until #2288.
@@ -288,42 +286,60 @@ pub struct MixOptions<'a> {
     pub limit: usize,
     /// Put the profile's first seed song at index 0.
     pub lead_with_seed: bool,
-    /// Songs last played at or after this unix time go last: they are never
-    /// scored as matches and fill only after every other eligible song.
+    /// Songs last played at or after this unix time are never scored as
+    /// matches and are picked only after every other eligible song.
     pub defer_played_since: Option<i64>,
     pub tuning: &'a Tuning,
 }
 
 /// Picks up to `opts.limit` song ids from `pool` to fit `profile`.
 ///
-/// Never returns a seed song (other than the lead) or an excluded song, and
-/// never more than `tuning.max_per_artist` songs by one artist, counting the
-/// lead. Matching songs come first, drawn at random weighted by artist tier
-/// and song fit, so every call differs and strong matches usually, but not
-/// always, lead. Unmatched eligible songs follow in random order, then
-/// deferred recent plays. Returns fewer than `limit` only when no eligible
-/// song is left under its artist's cap.
+/// Never returns a seed song (other than the lead) or an excluded song.
+/// Songs are drawn at random weighted by artist tier and song fit, so every
+/// call differs: matching songs are drawn before unmatched ones, and those
+/// before deferred recent plays. Each song's weight is divided by the square
+/// root of how many eligible songs its artist (`artist_key`) has in that
+/// tier, so a big catalogue raises an artist's chances only sub-linearly.
+///
+/// Each artist is capped by `limit`: a seed artist at `ceil(limit / 4)`
+/// songs (the lead included), any other at `max(2, ceil(limit / 12))`. The
+/// caps are soft: songs over a cap are used, in draw order, only once every
+/// tier is exhausted and the mix would otherwise come up short. So fewer than
+/// `limit` ids come back only when the pool has no more eligible songs.
+///
+/// Play order is independent of draw order: the lead stays at index 0 and
+/// each artist's songs are spread evenly through the rest, never two in a
+/// row unless the picked songs leave no other arrangement.
 pub fn pick(
     profile: &Profile,
     pool: &Pool,
     opts: &MixOptions,
     rng: &mut impl rand::Rng,
 ) -> Vec<i64> {
-    let t = opts.tuning;
-    let seed_ids: HashSet<i64> = profile.seeds.iter().map(|(id, _)| *id).collect();
-    let mut picked = Vec::with_capacity(opts.limit);
-    let mut per_artist: HashMap<&str, usize> = HashMap::new();
-
-    if opts.lead_with_seed && opts.limit > 0 {
-        if let Some((id, artist_key)) = profile.seeds.first() {
-            picked.push(*id);
-            if let Some(key) = artist_key.as_deref() {
-                per_artist.insert(key, 1);
-            }
+    let limit = opts.limit;
+    let seed_cap = limit.div_ceil(4);
+    let other_cap = limit.div_ceil(12).max(2);
+    let cap = |key: &str| {
+        if profile.artist_keys.contains(key) {
+            seed_cap
+        } else {
+            other_cap
         }
-    }
+    };
 
-    let entries = pool
+    let seed_ids: HashSet<i64> = profile.seeds.iter().map(|(id, _)| *id).collect();
+    let mut per_artist: HashMap<&str, usize> = HashMap::new();
+    let lead = profile
+        .seeds
+        .first()
+        .filter(|_| opts.lead_with_seed && limit > 0)
+        .map(|(id, key)| (*id, key.as_deref()));
+    if let Some((_, Some(key))) = lead {
+        per_artist.insert(key, 1);
+    }
+    let room = limit - usize::from(lead.is_some());
+
+    let mut entries: Vec<(Tier, f64, &Candidate)> = pool
         .candidates
         .iter()
         .filter(|c| !seed_ids.contains(&c.id) && !pool.exclusions.excludes(c))
@@ -334,7 +350,7 @@ pub fn pick(
             if deferred {
                 return (Tier::Deferred, 1.0, c);
             }
-            let w = profile.song_weight(c, pool, t);
+            let w = profile.song_weight(c, pool, opts.tuning);
             if w > 0.0 {
                 (Tier::Match, w, c)
             } else {
@@ -342,26 +358,175 @@ pub fn pick(
             }
         })
         .collect();
+    damp_large_catalogues(&mut entries);
 
+    let mut picked: Vec<(i64, Option<&str>)> = Vec::with_capacity(room);
+    let mut over_cap = Vec::new();
     for c in sample_order(entries, rng) {
-        if picked.len() >= opts.limit {
+        if picked.len() >= room {
             break;
         }
-        if let Some(key) = c.artist_key.as_deref() {
+        let key = c.artist_key.as_deref();
+        if let Some(key) = key {
             let n = per_artist.entry(key).or_default();
-            if *n >= t.max_per_artist {
+            if *n >= cap(key) {
+                over_cap.push((c.id, Some(key)));
                 continue;
             }
             *n += 1;
         }
-        picked.push(c.id);
+        picked.push((c.id, key));
     }
-    picked
+    let short = room - picked.len();
+    picked.extend(over_cap.into_iter().take(short));
+
+    let mut ids = Vec::with_capacity(limit);
+    ids.extend(lead.map(|(id, _)| id));
+    ids.extend(spread_artists(&picked, lead.and_then(|(_, key)| key), rng));
+    ids
 }
 
-/// Which part of the pick order a candidate falls in; every candidate in an
-/// earlier tier comes before any in a later one, whatever their weights.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// Divides each entry's weight by `sqrt(n)`, `n` being the number of entries
+/// in the same tier by the same `artist_key`. An artist's combined weight
+/// then grows with the square root of their catalogue: 200 matching songs
+/// against 5 make that artist about `sqrt(40)` ≈ 6× likelier to be drawn,
+/// not 40×. Songs with no artist key are left as they are.
+fn damp_large_catalogues(entries: &mut [(Tier, f64, &Candidate)]) {
+    let mut counts: HashMap<(Tier, &str), usize> = HashMap::new();
+    for (tier, _, c) in entries.iter() {
+        if let Some(key) = c.artist_key.as_deref() {
+            *counts.entry((*tier, key)).or_default() += 1;
+        }
+    }
+    for (tier, weight, c) in entries.iter_mut() {
+        if let Some(key) = c.artist_key.as_deref() {
+            *weight /= (counts[&(*tier, key)] as f64).sqrt();
+        }
+    }
+}
+
+/// Orders `songs` (id and artist key) so each artist's songs are spread
+/// evenly through the list and no artist plays twice in a row (counting
+/// `after`, the artist just before the list), whenever such an order exists.
+/// When no order avoids repeats, the result has as few as possible. Songs
+/// with no artist key never count as repeats; one artist's songs keep the
+/// order given; the arrangement is otherwise random.
+fn spread_artists(
+    songs: &[(i64, Option<&str>)],
+    after: Option<&str>,
+    rng: &mut impl rand::Rng,
+) -> Vec<i64> {
+    // Every artist gets a random phase `u` in [0, 1); its `j`-th song of `n`
+    // aims for the fractional position `(j + u) / n`, so a heavy artist
+    // lands every few slots instead of bunching at the front, and single-song
+    // artists fall in random order. (A fixed phase would give every
+    // single-song artist the same aim and bring the bunching back.) Slots are
+    // filled in order of aim, skipping the artist just placed, but an artist
+    // whose songs left would otherwise become impossible to keep apart is
+    // placed first. With no order free of repeats, the artist with the most
+    // songs left goes next.
+    // One group per artist key, in first-appearance order; every unkeyed
+    // song is its own group.
+    struct Group<'a> {
+        key: Option<&'a str>,
+        /// Ids and their index in `songs`, in the order given.
+        songs: Vec<(usize, i64)>,
+        placed: usize,
+        phase: f64,
+    }
+    impl Group<'_> {
+        fn left(&self) -> usize {
+            self.songs.len() - self.placed
+        }
+        fn aim(&self) -> f64 {
+            (self.placed as f64 + self.phase) / self.songs.len() as f64
+        }
+    }
+
+    let mut groups: Vec<Group> = Vec::new();
+    let mut by_key: HashMap<&str, usize> = HashMap::new();
+    for (i, &(id, key)) in songs.iter().enumerate() {
+        let g = match key.and_then(|k| by_key.get(k)) {
+            Some(&g) => g,
+            None => {
+                groups.push(Group {
+                    key,
+                    songs: Vec::new(),
+                    placed: 0,
+                    phase: rng.random::<f64>(),
+                });
+                if let Some(k) = key {
+                    by_key.insert(k, groups.len() - 1);
+                }
+                groups.len() - 1
+            }
+        };
+        groups[g].songs.push((i, id));
+    }
+
+    let mut out = Vec::with_capacity(songs.len());
+    let mut last = after;
+    while out.len() < songs.len() {
+        let slots_after = songs.len() - out.len() - 1;
+        let repeats = |g: &Group| g.key.is_some() && g.key == last;
+        // Placing `g` leaves `slots_after` slots, the first of which `g`
+        // can't take. That's still arrangeable iff `g` has at most
+        // floor(slots_after / 2) songs left and every other artist at most
+        // ceil(slots_after / 2). Unkeyed groups hold one song, so only keyed
+        // groups can break this, and only the two with the most songs left
+        // need checking, which keeps each slot linear in the artist count.
+        // `fullest` is the keyed group with the most songs left (index,
+        // count); `runner_up` the next-highest count among the rest.
+        let mut fullest: Option<(usize, usize)> = None;
+        let mut runner_up = 0;
+        for (gi, g) in groups.iter().enumerate().filter(|(_, g)| g.key.is_some()) {
+            match fullest {
+                Some((_, most)) if g.left() <= most => runner_up = runner_up.max(g.left()),
+                _ => {
+                    runner_up = fullest.map_or(0, |(_, most)| most);
+                    fullest = Some((gi, g.left()));
+                }
+            }
+        }
+        let keeps_order_possible = |gi: usize| {
+            let others_most = match fullest {
+                Some((fi, _)) if fi == gi => runner_up,
+                Some((_, most)) => most,
+                None => 0,
+            };
+            let own_ok = groups[gi].key.is_none() || groups[gi].left() - 1 <= slots_after / 2;
+            own_ok && others_most <= slots_after.div_ceil(2)
+        };
+        let next_song = |g: &Group| g.songs[g.placed].0;
+        let open = || {
+            groups
+                .iter()
+                .enumerate()
+                .filter(|(_, g)| g.left() > 0 && !repeats(g))
+        };
+        let chosen = open()
+            .filter(|(gi, _)| keeps_order_possible(*gi))
+            .min_by(|(_, a), (_, b)| {
+                a.aim()
+                    .total_cmp(&b.aim())
+                    .then(next_song(a).cmp(&next_song(b)))
+            })
+            .or_else(|| open().max_by_key(|(_, g)| (g.left(), std::cmp::Reverse(next_song(g)))))
+            .map(|(gi, _)| gi)
+            // Only the artist just placed has songs left.
+            .or_else(|| groups.iter().position(|g| g.left() > 0))
+            .expect("a song is left while the output is short");
+        let g = &mut groups[chosen];
+        out.push(g.songs[g.placed].1);
+        g.placed += 1;
+        last = g.key;
+    }
+    out
+}
+
+/// Which part of the draw order a candidate falls in; every candidate in an
+/// earlier tier is drawn before any in a later one, whatever their weights.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Tier {
     /// Shares something with the profile; weighted by `match_weight`.
     Match,
@@ -536,7 +701,6 @@ mod tests {
     const NOW: i64 = 1_800_000_000;
 
     const TUNING: Tuning = Tuning {
-        max_per_artist: 2,
         bpm_window: 15.0,
         rating: RatingBoost {
             loved: 1.0,
@@ -816,19 +980,226 @@ mod tests {
         assert!(pick_with(&[], &pool(vec![]), &lead, 7).is_empty());
     }
 
+    /// `count` songs by `artist`, ids from `first`, all in `genre`.
+    fn catalogue(first: i64, count: i64, artist: &str, genre: &str) -> Vec<Candidate> {
+        (first..first + count)
+            .map(|id| song(id, artist, &[genre], 1980, 120.0))
+            .collect()
+    }
+
+    /// `count` single-song artists, ids from `first`.
+    fn singles(first: i64, count: i64, genre: &str) -> Vec<Candidate> {
+        (first..first + count)
+            .map(|id| song(id, &format!("solo {id}"), &[genre], 1980, 120.0))
+            .collect()
+    }
+
+    fn by_artist(picked: &[i64], ids: std::ops::Range<i64>) -> usize {
+        picked.iter().filter(|&&id| ids.contains(&id)).count()
+    }
+
     #[test]
     fn lead_counts_toward_its_artists_cap() {
+        // limit 8: the seed artist's cap is ceil(8 / 4) = 2, lead included.
         let seeds = [song(1, "Same", &["Rock"], 1980, 120.0)];
-        let lib: Vec<Candidate> = (10..16)
-            .map(|id| song(id, "Same", &["Rock"], 1980, 120.0))
+        let lib = [catalogue(10, 6, "Same", "Rock"), singles(100, 10, "Jazz")].concat();
+        let lead = MixOptions {
+            lead_with_seed: true,
+            ..opts(8)
+        };
+        for seed in 0..20 {
+            let picked = pick_with(&seeds, &pool(lib.clone()), &lead, seed);
+            assert_eq!(picked[0], 1);
+            assert_eq!(picked.len(), 8);
+            assert_eq!(by_artist(&picked, 10..16), 1, "{picked:?}");
+        }
+    }
+
+    #[test]
+    fn caps_scale_with_the_requested_length() {
+        // Radio's length: seed artist ceil(40 / 4) = 10, others
+        // max(2, ceil(40 / 12)) = 4. 26 single-song artists make up exactly
+        // the rest, so both caps are reached and nothing overflows.
+        let seeds = [song(1, "Seed", &["Rock"], 1980, 120.0)];
+        let lib = [
+            catalogue(10, 30, "Seed", "Rock"),
+            catalogue(100, 30, "Big", "Rock"),
+            singles(200, 26, "Rock"),
+        ]
+        .concat();
+        for seed in 0..20 {
+            let picked = pick_with(&seeds, &pool(lib.clone()), &opts(40), seed);
+            assert_eq!(picked.len(), 40);
+            assert_eq!(by_artist(&picked, 10..40), 10, "{picked:?}");
+            assert_eq!(by_artist(&picked, 100..130), 4, "{picked:?}");
+        }
+    }
+
+    #[test]
+    fn songs_over_a_cap_fill_only_when_the_mix_would_come_up_short() {
+        let seeds = [song(1, "Seed", &["Rock"], 1980, 120.0)];
+        // Only one artist: the cap (2 at limit 5) gives way to fill the mix.
+        let picked = pick_with(&seeds, &pool(catalogue(10, 6, "Same", "Rock")), &opts(5), 7);
+        assert_eq!(picked.len(), 5);
+        // Over-cap matches wait behind unmatched and deferred songs alike.
+        let mut recent = song(30, "Recent", &["Jazz"], 1950, 60.0);
+        recent.lastplayed = Some(NOW - 60);
+        let lib = [
+            catalogue(10, 6, "Same", "Rock"),
+            vec![song(20, "Other", &["Jazz"], 1950, 60.0), recent],
+        ]
+        .concat();
+        let defer = MixOptions {
+            defer_played_since: Some(NOW - 3600),
+            ..opts(5)
+        };
+        for seed in 0..20 {
+            let picked = pick_with(&seeds, &pool(lib.clone()), &defer, seed);
+            assert_eq!(picked.len(), 5);
+            assert!(picked.contains(&20) && picked.contains(&30), "{picked:?}");
+            assert_eq!(by_artist(&picked, 10..16), 3, "{picked:?}");
+        }
+    }
+
+    #[test]
+    fn big_catalogues_are_damped_to_the_square_root() {
+        // Equal scores, 200 songs against 5: undamped, "Big" would be drawn
+        // 40x as often; damped, sqrt(40) ≈ 6.3x.
+        let seeds = [song(1, "Seed", &["Rock"], 1980, 120.0)];
+        let p = pool(
+            [
+                catalogue(1000, 200, "Big", "Rock"),
+                catalogue(10, 5, "Small", "Rock"),
+            ]
+            .concat(),
+        );
+        let runs = 4000;
+        let small = (0..runs)
+            .filter(|&seed| pick_with(&seeds, &p, &opts(1), seed)[0] < 1000)
+            .count();
+        let ratio = (runs as usize - small) as f64 / small as f64;
+        assert!(
+            (4.5..9.0).contains(&ratio),
+            "ratio {ratio} over {runs} runs"
+        );
+    }
+
+    /// The fewest repeats any order of `counts` (songs per artist) can have,
+    /// following artist `after`: brute force over every order, memoised.
+    fn min_repeats(
+        counts: &mut Vec<usize>,
+        after: Option<usize>,
+        memo: &mut HashMap<(Vec<usize>, Option<usize>), usize>,
+    ) -> usize {
+        if counts.iter().all(|&n| n == 0) {
+            return 0;
+        }
+        if let Some(&m) = memo.get(&(counts.clone(), after)) {
+            return m;
+        }
+        let mut best = usize::MAX;
+        for a in 0..counts.len() {
+            if counts[a] > 0 {
+                counts[a] -= 1;
+                let r = usize::from(after == Some(a)) + min_repeats(counts, Some(a), memo);
+                counts[a] += 1;
+                best = best.min(r);
+            }
+        }
+        memo.insert((counts.clone(), after), best);
+        best
+    }
+
+    fn repeats(order: &[i64], artist_of: &HashMap<i64, &str>, after: Option<&str>) -> usize {
+        let mut prev = after;
+        let mut n = 0;
+        for id in order {
+            let a = artist_of[id];
+            n += usize::from(prev == Some(a));
+            prev = Some(a);
+        }
+        n
+    }
+
+    #[test]
+    fn spread_has_the_fewest_repeats_possible() {
+        // Exhaustive over every song count 0–4 for each of 4 artists (625
+        // multisets), each with no preceding artist and with artist "a"
+        // preceding, songs given grouped by artist a..d. The spread must
+        // match the brute-force minimum: none whenever some order avoids
+        // repeats.
+        const NAMES: [&str; 4] = ["a", "b", "c", "d"];
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut memo = HashMap::new();
+        let (mut cases, mut repeat_free_cases) = (0, 0);
+        for code in 0..625usize {
+            let counts: Vec<usize> = (0..4).map(|i| code / 5usize.pow(i) % 5).collect();
+            let mut songs = Vec::new();
+            let mut artist_of = HashMap::new();
+            for (a, &n) in counts.iter().enumerate() {
+                for _ in 0..n {
+                    let id = songs.len() as i64;
+                    songs.push((id, Some(NAMES[a])));
+                    artist_of.insert(id, NAMES[a]);
+                }
+            }
+            for after in [None, Some(0)] {
+                cases += 1;
+                let order = spread_artists(&songs, after.map(|a| NAMES[a]), &mut rng);
+                let mut sorted = order.clone();
+                sorted.sort();
+                assert_eq!(sorted, (0..songs.len() as i64).collect::<Vec<_>>());
+                let reps = repeats(&order, &artist_of, after.map(|a| NAMES[a]));
+                let best = min_repeats(&mut counts.clone(), after, &mut memo);
+                assert_eq!(reps, best, "{counts:?} after {after:?}: {order:?}");
+                repeat_free_cases += usize::from(best == 0);
+            }
+        }
+        assert_eq!(cases, 1250);
+        // The other 140 have one artist with too many songs to keep apart.
+        assert_eq!(repeat_free_cases, 1110);
+    }
+
+    #[test]
+    fn spread_places_a_heavy_artist_evenly_not_at_the_front() {
+        // 10 songs by "a" drawn first, then 30 single-song artists: plain
+        // "most songs left first" would play "a" in every other slot until
+        // slot 20. Spread, roughly half of "a" lands in each half.
+        let songs: Vec<(i64, Option<&str>)> = (0..10)
+            .map(|id| (id, Some("a")))
+            .chain((10..40).map(|id| (id, None)))
+            .collect();
+        for seed in 0..200 {
+            let order = spread_artists(&songs, None, &mut StdRng::seed_from_u64(seed));
+            let first_half = order[..20].iter().filter(|id| **id < 10).count();
+            assert!((3..=7).contains(&first_half), "seed {seed}: {order:?}");
+        }
+    }
+
+    #[test]
+    fn mix_spreads_artists_and_keeps_the_lead_first() {
+        let seeds = [song(1, "Seed", &["Rock"], 1980, 120.0)];
+        let lib = [
+            catalogue(10, 30, "Seed", "Rock"),
+            catalogue(100, 30, "Big", "Rock"),
+            catalogue(200, 30, "Mid", "Rock"),
+            singles(300, 20, "Rock"),
+        ]
+        .concat();
+        let artist_of: HashMap<i64, &str> = lib
+            .iter()
+            .map(|c| (c.id, c.artist_key.as_deref().unwrap()))
+            .chain([(1, "seed")])
             .collect();
         let lead = MixOptions {
             lead_with_seed: true,
-            ..opts(10)
+            ..opts(40)
         };
-        let picked = pick_with(&seeds, &pool(lib), &lead, 7);
-        assert_eq!(picked[0], 1);
-        assert_eq!(picked.len(), TUNING.max_per_artist);
+        for seed in 0..50 {
+            let picked = pick_with(&seeds, &pool(lib.clone()), &lead, seed);
+            assert_eq!(picked[0], 1);
+            assert_eq!(repeats(&picked, &artist_of, None), 0, "{picked:?}");
+        }
     }
 
     #[test]
@@ -869,12 +1240,10 @@ mod tests {
             .map(|id| song(id, "Same", &["Rock"], 1980, 120.0))
             .chain([song(20, "Other", &["Jazz"], 1950, 60.0)])
             .collect();
+        // At limit 3 a non-seed artist's cap is 2.
         let picked = pick_default(&seeds, lib, 3);
         assert_eq!(picked.len(), 3);
-        assert_eq!(
-            picked.iter().filter(|id| **id < 20).count(),
-            TUNING.max_per_artist
-        );
+        assert_eq!(picked.iter().filter(|id| **id < 20).count(), 2);
         assert!(picked.contains(&20));
     }
 
