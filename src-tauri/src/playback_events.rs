@@ -9,6 +9,7 @@
 //!    `playlists` lock in Auto Continue never nests inside `player`).
 
 use crate::audio::{AudioEngine, AudioEvent, PipelineEqSnapshot};
+use crate::continue_mix::AutoContinueSeed;
 use crate::models::{AudioPipelineInfo, PlayState, PlaybackState, Song};
 use crate::now_playing::StationNowPlaying;
 use crate::player::Player;
@@ -50,21 +51,6 @@ pub(crate) struct PlaybackErrorPayload {
 pub(crate) struct OutputFallbackPayload {
     pub requested: AudioBackendKind,
     pub reason: OutputFallbackReason,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AutoContinueSeed {
-    pub playlist_id: i64,
-    pub song_ids: Vec<i64>,
-}
-
-impl From<(i64, Vec<i64>)> for AutoContinueSeed {
-    fn from((playlist_id, song_ids): (i64, Vec<i64>)) -> Self {
-        Self {
-            playlist_id,
-            song_ids,
-        }
-    }
 }
 
 /// Everything an [`AudioEvent`] changed plus the snapshots captured before
@@ -296,7 +282,7 @@ async fn build_track_started(
         p.get_pipeline_info(&a)
     };
     let pending_station_click_uuid = p.take_pending_station_click_uuid();
-    let auto_continue_seed = p.auto_continue_seed().map(AutoContinueSeed::from);
+    let auto_continue_seed = p.auto_continue_seed();
     PlaybackChange {
         track_started: true,
         sync_device_eq,
@@ -1047,6 +1033,7 @@ mod tests {
                 RecordedCall::AutoContinue(AutoContinueSeed {
                     playlist_id: 7,
                     song_ids: vec![1],
+                    last_song_id: 2,
                 }),
             ]
         );
@@ -1125,6 +1112,7 @@ mod tests {
                 RecordedCall::AutoContinue(AutoContinueSeed {
                     playlist_id: 7,
                     song_ids: vec![2, 1],
+                    last_song_id: 2,
                 }),
             ]
         );

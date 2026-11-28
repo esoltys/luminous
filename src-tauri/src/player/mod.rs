@@ -1395,20 +1395,23 @@ impl Player {
     }
 
     /// When Auto Continue should top up the playing list right now, returns
-    /// its playlist id and the seed songs: the current song and the ones
-    /// before it in playback order, most recent first, up to
-    /// `continue_mix::SEED_COUNT`. Requires Auto Continue on, Repeat off, and
-    /// at most `continue_mix::TOP_UP_THRESHOLD` songs left (play-next items
-    /// included). The caller still checks the playlist is the Queue — that
-    /// needs the playlists lock, which must not nest inside this one.
-    pub fn auto_continue_seed(&self) -> Option<(i64, Vec<i64>)> {
+    /// what the top-up is built from (see `AutoContinueSeed`). Requires Auto
+    /// Continue on, Repeat off, and at most `continue_mix::TOP_UP_THRESHOLD`
+    /// songs left (play-next items included). The caller still checks the
+    /// playlist is the Queue — that needs the playlists lock, which must not
+    /// nest inside this one.
+    pub fn auto_continue_seed(&self) -> Option<crate::continue_mix::AutoContinueSeed> {
         if !self.auto_continue {
             return None;
         }
         let playlist_id = self.current_playlist_id?;
         let song = self.current_song.as_ref()?;
-        let seeds = self.order.auto_continue_seeds(song.id)?;
-        Some((playlist_id, seeds))
+        let song_ids = self.order.auto_continue_seeds(song.id)?;
+        Some(crate::continue_mix::AutoContinueSeed {
+            playlist_id,
+            song_ids,
+            last_song_id: self.order.last_song_ahead().unwrap_or(song.id),
+        })
     }
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
@@ -1690,7 +1693,14 @@ mod tests {
 
         player.order.set_current_index(Some(3));
         player.current_song = Some(song(4));
-        assert_eq!(player.auto_continue_seed(), Some((7, vec![4, 3, 2])));
+        assert_eq!(
+            player.auto_continue_seed(),
+            Some(crate::continue_mix::AutoContinueSeed {
+                playlist_id: 7,
+                song_ids: vec![4, 3, 2],
+                last_song_id: 5,
+            })
+        );
 
         player.set_repeat_mode(RepeatMode::Playlist);
         assert_eq!(
