@@ -442,6 +442,14 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
       expect(toastStore.messages).toEqual([
         expect.objectContaining({ text: "3 songs updated", type: "library", autoDismisses: true }),
       ]);
+
+      // Closing the progress toast mid-batch still ends in exactly one summary.
+      toastStore.messages = [];
+      eventCallbacks["batch-processing-started"]({ payload: { total_count: 4 } });
+      toastStore.dismissTask("watcher-batch");
+      eventCallbacks["batch-processing-completed"]({ payload: { total_count: 4 } });
+      vi.advanceTimersByTime(2000);
+      expect(toastStore.messages.map((m) => m.text)).toEqual(["4 songs updated"]);
     } finally {
       vi.useRealTimers();
     }

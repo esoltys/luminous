@@ -611,11 +611,10 @@ class CollectionStore {
 
       await this.events.listen<BatchProgress>("batch-processing-completed", (event) => {
         const { total_count } = event.payload;
-        tasksStore.completeTask(
+        tasksStore.completeQuietly(
           WATCHER_TASK_ID,
           i18n.plural("settings.batchProcessingDoneToast", total_count),
         );
-        toastStore.dismissTask(WATCHER_TASK_ID);
         libraryToasts.report(WATCHER_SONGS_UPDATED, total_count);
       });
 

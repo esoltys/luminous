@@ -20,6 +20,26 @@ describe("TasksStore", () => {
     expect(tasksStore.overallProgress).toBeNull();
   });
 
+  it("completeQuietly marks a task done and removes its toast without a completion toast", () => {
+    toastStore.messages = [];
+    tasksStore.startTask({ id: "quiet", label: "Processing songs", total: 2 });
+    expect(toastStore.messages).toHaveLength(1);
+
+    tasksStore.completeQuietly("quiet", "2 songs updated");
+    expect(tasksStore.tasks[0]).toMatchObject({
+      status: "done",
+      label: "2 songs updated",
+      current: 2,
+    });
+    expect(toastStore.messages).toEqual([]);
+
+    // Also when the user had already closed the live toast.
+    tasksStore.startTask({ id: "quiet", label: "Processing songs" });
+    toastStore.dismissTask("quiet");
+    tasksStore.completeQuietly("quiet", "1 song updated");
+    expect(toastStore.messages).toEqual([]);
+  });
+
   it("calculates progress when total and current are provided", () => {
     const id = tasksStore.startTask({ id: "test-progress", label: "Importing tracks", total: 100 });
     expect(tasksStore.tasks[0].progress).toBe(0);

@@ -263,7 +263,11 @@ class ToastStore {
     if (!this.mergeWindow(type, variant, url, action).mergeableUntil) return null;
     const now = Date.now();
     const target = this.messages.findLast(
-      (m) => m.type === type && m.mergeableUntil !== undefined && m.mergeableUntil > now,
+      (m) =>
+        m.type === type &&
+        followsPreferences(m) &&
+        m.mergeableUntil !== undefined &&
+        m.mergeableUntil > now,
     );
     if (!target) return null;
     target.text = text;

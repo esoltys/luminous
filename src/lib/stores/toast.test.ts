@@ -439,6 +439,27 @@ describe("ToastStore batching", () => {
     expect(toastStore.messages.every((m) => !m.moreCount)).toBe(true);
   });
 
+  it("never folds into a toast that has since turned into an error", () => {
+    toastStore.setBatchWait("devices", 10);
+    const id = devices.show("Syncing Walkman", "info");
+    toastStore.update(id, "Sync failed", "error");
+    devices.show("Walkman connected", "success");
+    expect(texts()).toEqual(["Sync failed", "Walkman connected"]);
+  });
+
+  it("holds a report raised before saved waits load to the wait they bring", async () => {
+    library.report(moved, 2);
+    vi.mocked(invoke).mockResolvedValueOnce({
+      notification_batch_waits: JSON.stringify({ library: 60 }),
+    });
+    await toastStore.loadPreferences();
+
+    vi.advanceTimersByTime(1200);
+    expect(texts()).toEqual([]);
+    vi.advanceTimersByTime(60_000 - 1200);
+    expect(texts()).toEqual(["Auto-organized 2 files"]);
+  });
+
   it("doesn't fold plain toasts when the type has no wait", () => {
     devices.show("Walkman connected", "success");
     devices.show("Walkman synced", "success");
