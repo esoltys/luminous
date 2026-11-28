@@ -18,8 +18,12 @@ import type {
 import { navigationStore } from "./navigation.svelte";
 import { playerStore } from "./player.svelte";
 import { playlistsStore } from "./playlists.svelte";
+import { tasksStore } from "./tasks.svelte";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
+import { TOAST_DURATION_MS } from "../constants";
+
+const RADIO_SYNC_TASK_ID = "radio-directory-sync";
 
 type RadioSubView = "my_stations" | "discover";
 
@@ -189,6 +193,9 @@ class RadioStore {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private initialized = false;
   private savedLoaded = false;
+  /** True while `syncDirectory()` is awaiting `sync_radio_directory`, so the `done`
+   * progress event doesn't pre-empt `syncDirectory()`'s richer completion count. */
+  private syncCallInFlight = false;
 
   get subView(): RadioSubView {
     return this._subView;
@@ -246,6 +253,15 @@ class RadioStore {
     );
   }
 
+  private ensureSyncTaskStarted() {
+    if (!tasksStore.isTaskActive(RADIO_SYNC_TASK_ID)) {
+      const label = this.status?.optedIn
+        ? i18n.t("radio.refreshingIndex")
+        : i18n.t("radio.syncingIndex");
+      tasksStore.startTask({ id: RADIO_SYNC_TASK_ID, label });
+    }
+  }
+
   async init(): Promise<void> {
     if (!this.initialized) {
       this.initialized = true;
@@ -255,6 +271,23 @@ class RadioStore {
           (event) => {
             this.syncProgress = event.payload;
             this.syncing = !event.payload.done;
+            if (!event.payload.done) {
+              this.ensureSyncTaskStarted();
+              if (event.payload.fetchedStations > 0) {
+                tasksStore.updateTask(RADIO_SYNC_TASK_ID, {
+                  label: i18n.t("radio.syncProgressDetail", {
+                    count: event.payload.fetchedStations,
+                    page: event.payload.page,
+                  }),
+                });
+              }
+            } else if (!this.syncCallInFlight && tasksStore.isTaskActive(RADIO_SYNC_TASK_ID)) {
+              tasksStore.completeTask(
+                RADIO_SYNC_TASK_ID,
+                i18n.t("radio.syncCompleteSimple"),
+                TOAST_DURATION_MS,
+              );
+            }
           },
         );
         const unlistenChanged = await listen("radio-directory-changed", () => {
@@ -287,6 +320,9 @@ class RadioStore {
       this.status = status;
       this.syncing = status.syncInProgress;
       this.syncError = status.lastError ?? null;
+      if (status.syncInProgress) {
+        this.ensureSyncTaskStarted();
+      }
       await this.loadMyStations();
       if (status.optedIn && status.stationCount > 0) {
         await this.dropMissingRestoredFilters();
@@ -350,17 +386,27 @@ class RadioStore {
   }
 
   async syncDirectory(): Promise<void> {
+    if (this.syncCallInFlight) return;
+    this.syncCallInFlight = true;
     this.syncing = true;
     this.syncError = null;
     this.syncProgress = { mode: "full", fetchedStations: 0, page: 1, done: false };
+    this.ensureSyncTaskStarted();
     try {
-      await invoke<RadioDirectorySyncStats>("sync_radio_directory");
+      const stats = await invoke<RadioDirectorySyncStats>("sync_radio_directory");
+      const completedLabel =
+        stats?.totalStations != null
+          ? i18n.t("radio.syncComplete", { count: stats.totalStations.toLocaleString() })
+          : i18n.t("radio.syncCompleteSimple");
+      tasksStore.completeTask(RADIO_SYNC_TASK_ID, completedLabel, TOAST_DURATION_MS);
       await this.refreshStatusAndData();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.syncError = message;
+      tasksStore.failTask(RADIO_SYNC_TASK_ID, message);
     } finally {
       this.syncing = false;
+      this.syncCallInFlight = false;
     }
   }
 
