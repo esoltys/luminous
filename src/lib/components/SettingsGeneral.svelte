@@ -168,7 +168,7 @@
           {notificationTypeHint(type)}
         </p>
       </div>
-      <div class="flex flex-wrap items-center gap-2 shrink-0">
+      <div class="flex flex-wrap items-center gap-2 shrink-0 ml-auto">
         {#if BATCHABLE_TYPES.includes(type)}
           <Select
             id="notification-batch-wait-{type}"
