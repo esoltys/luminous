@@ -42,33 +42,54 @@ const TUNING: Tuning = Tuning {
     },
 };
 
-fn mix_options(now: i64, count: usize) -> MixOptions<'static> {
+/// What a top-up is built from, captured under one `Player` lock by
+/// `Player::auto_continue_seed`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoContinueSeed {
+    /// The playing list; the top-up applies only if it is the Queue.
+    pub playlist_id: i64,
+    /// The current song and the ones before it in playback order, most
+    /// recent first, up to `SEED_COUNT`.
+    pub song_ids: Vec<i64>,
+    /// The song that plays right before the appended batch, so the batch
+    /// doesn't open with its artist (#2441). Taken from the play order
+    /// rather than the Queue's last row, which differs under shuffle or with
+    /// a Play Next song pending.
+    pub song_before_batch: i64,
+}
+
+fn mix_options(now: i64, count: usize, after_artist: Option<&str>) -> MixOptions<'_> {
     MixOptions {
         limit: count,
         lead_with_seed: false,
+        after_artist,
         defer_played_since: Some(now - RECENT_PLAY_WINDOW_SECS),
         tuning: &TUNING,
     }
 }
 
-/// Picks up to `count` songs to follow `seed_ids` (most recent first), never
-/// one in `exclude_ids` (the songs already in the Queue).
+/// Picks up to `count` songs to follow `seed`, never one in `exclude_ids`
+/// (the songs already in the Queue).
 pub fn select_songs(
     conn: &Connection,
-    seed_ids: &[i64],
+    seed: &AutoContinueSeed,
     exclude_ids: &HashSet<i64>,
     now: i64,
     count: usize,
     rng: &mut impl rand::Rng,
 ) -> Result<Vec<i64>> {
-    let seeds = song_mix::load_by_ids(conn, seed_ids)?;
+    // The song before the batch is loaded through `song_mix` so its artist
+    // key follows the same rule as every candidate's.
+    let before = song_mix::load_by_ids(conn, &[seed.song_before_batch])?.pop();
+    let seeds = song_mix::load_by_ids(conn, &seed.song_ids)?;
     let mut pool = Pool::load(conn)?;
     pool.exclude_songs(exclude_ids.iter().copied());
     let profile = Profile::from_seeds(&seeds, &pool);
+    let after_artist = before.as_ref().and_then(|c| c.artist_key.as_deref());
     Ok(song_mix::pick(
         &profile,
         &pool,
-        &mix_options(now, count),
+        &mix_options(now, count, after_artist),
         rng,
     ))
 }
@@ -104,13 +125,13 @@ async fn extend(app: &tauri::AppHandle) -> Result<()> {
         return Ok(());
     };
 
-    let Some((playlist_id, seed_ids)) = state.player.lock().await.auto_continue_seed() else {
+    let Some(seed) = state.player.lock().await.auto_continue_seed() else {
         return Ok(());
     };
 
     let queue_items = crate::playlist::with_playlists(&state.playlists, |pm| {
         let queue = pm.queue()?;
-        if queue.id != playlist_id {
+        if queue.id != seed.playlist_id {
             return Ok(None);
         }
         Ok(Some((queue.id, pm.get_playlist_tracks(queue.id)?)))
@@ -128,14 +149,7 @@ async fn extend(app: &tauri::AppHandle) -> Result<()> {
     let now = crate::clock::unix_now();
     let ids = tokio::task::spawn_blocking(move || {
         let conn = db.pool.get()?;
-        select_songs(
-            &conn,
-            &seed_ids,
-            &in_queue,
-            now,
-            BATCH_SIZE,
-            &mut rand::rng(),
-        )
+        select_songs(&conn, &seed, &in_queue, now, BATCH_SIZE, &mut rand::rng())
     })
     .await??;
     if ids.is_empty() {
@@ -194,7 +208,7 @@ mod tests {
         let picked = song_mix::pick(
             &profile,
             &pool,
-            &mix_options(NOW, 3),
+            &mix_options(NOW, 3, None),
             &mut StdRng::seed_from_u64(7),
         );
         // Two "Same" matches (the cap), then the unrelated song takes the

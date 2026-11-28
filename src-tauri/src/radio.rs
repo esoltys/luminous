@@ -33,6 +33,7 @@ fn mix_options(limit: usize) -> MixOptions<'static> {
     MixOptions {
         limit,
         lead_with_seed: true,
+        after_artist: None,
         defer_played_since: None,
         tuning: &TUNING,
     }
