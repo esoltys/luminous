@@ -2544,6 +2544,17 @@ export const uk = {
     typePlaybackHint: "Перемикання аудіовиходу на інший пристрій чи режим і назад",
     typeCelebrations: "Досягнення та святкування",
     typeCelebrationsHint: "Досягнення бібліотеки, завершені списки відтворення та інші святкування",
+    batchWaitLabel: "Як часто показувати: {type}",
+    batchWaitNone: "Показувати одразу",
+    batchWait10s: "Групувати кожні 10 секунд",
+    batchWait1m: "Групувати щохвилини",
+    batchWait5m: "Групувати кожні 5 хвилин",
+    moreCount: {
+      one: "і ще {count}",
+      few: "і ще {count}",
+      many: "і ще {count}",
+      other: "і ще {count}",
+    },
   },
   osNotification: {
     appUpdated: "Luminous оновлено до v{version}",

@@ -16,7 +16,19 @@
     notificationTypeLabel,
     notificationTypeHint,
     type NotificationPreference,
+    BATCHABLE_TYPES,
+    BATCH_WAIT_OPTIONS_S,
+    type BatchWaitSeconds,
   } from "../stores/toast.svelte";
+
+  const BATCH_WAIT_LABEL_KEYS: Record<BatchWaitSeconds, string> = {
+    0: "notifications.batchWaitNone",
+    10: "notifications.batchWait10s",
+    60: "notifications.batchWait1m",
+    300: "notifications.batchWait5m",
+  };
+  const SELECT_CLASS =
+    "shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium disabled:opacity-50 disabled:hover:border-brand-border";
 
   // Label and hint keys are spelled out, not built from a suffix, so they stay greppable.
   const AUTO_PLAYLIST_FAMILIES: { family: AutoPlaylistFamily; label: string; hint: string }[] = [
@@ -144,8 +156,8 @@
   </div>
 
   {#each NOTIFICATION_TYPES as type (type)}
-    <div class="flex items-center justify-between gap-4 py-4">
-      <div class="flex flex-col gap-0.5 min-w-0">
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
+      <div class="flex flex-col gap-0.5 min-w-0 basis-60 grow">
         <label
           for="notification-preference-{type}"
           class="text-sm font-medium text-brand-text-primary"
@@ -156,18 +168,37 @@
           {notificationTypeHint(type)}
         </p>
       </div>
-      <Select
-        id="notification-preference-{type}"
-        value={toastStore.preferenceFor(type)}
-        onchange={(e) =>
-          toastStore.setPreference(type, e.currentTarget.value as NotificationPreference)}
-        class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-      >
-        <option value="default">{i18n.t("notifications.preferenceDefault")}</option>
-        <option value="high">{i18n.t("notifications.preferenceHigh")}</option>
-        <option value="low">{i18n.t("notifications.preferenceLow")}</option>
-        <option value="off">{i18n.t("notifications.preferenceOff")}</option>
-      </Select>
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        {#if BATCHABLE_TYPES.includes(type)}
+          <Select
+            id="notification-batch-wait-{type}"
+            ariaLabel={i18n.t("notifications.batchWaitLabel", {
+              type: notificationTypeLabel(type),
+            })}
+            value={String(toastStore.batchWaitFor(type))}
+            disabled={toastStore.preferenceFor(type) === "off"}
+            onchange={(e) =>
+              toastStore.setBatchWait(type, Number(e.currentTarget.value) as BatchWaitSeconds)}
+            class={SELECT_CLASS}
+          >
+            {#each BATCH_WAIT_OPTIONS_S as seconds (seconds)}
+              <option value={String(seconds)}>{i18n.t(BATCH_WAIT_LABEL_KEYS[seconds])}</option>
+            {/each}
+          </Select>
+        {/if}
+        <Select
+          id="notification-preference-{type}"
+          value={toastStore.preferenceFor(type)}
+          onchange={(e) =>
+            toastStore.setPreference(type, e.currentTarget.value as NotificationPreference)}
+          class={SELECT_CLASS}
+        >
+          <option value="default">{i18n.t("notifications.preferenceDefault")}</option>
+          <option value="high">{i18n.t("notifications.preferenceHigh")}</option>
+          <option value="low">{i18n.t("notifications.preferenceLow")}</option>
+          <option value="off">{i18n.t("notifications.preferenceOff")}</option>
+        </Select>
+      </div>
     </div>
   {/each}
 </div>

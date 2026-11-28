@@ -17,7 +17,9 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
   priority (always stays) or low priority (always auto-dismisses). `toastStore` applies the preference,
   so callers never read it; a source that notifies on its own raises toasts through
   `toastStore.channel(type)`, and plain `toastStore.show()` is an "Action confirmation". Errors and
-  warnings ignore the preference.
+  warnings ignore the preference. Library, device and playback notifications can also wait to be
+  grouped (#2424): a source that repeats a countable event calls `channel.report(kind, count)` rather
+  than building its own debounce, and the store sums each kind into one toast.
 
 - **Explicit-action-only celebrations**: Micro-animations (heart pulse, confetti, etc.) must fire only in
   response to a deliberate user interaction (e.g., a click handler). Never trigger them from a reactive

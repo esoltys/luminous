@@ -2553,6 +2553,17 @@ export const ru = {
     typePlaybackHint: "Переключение аудиовыхода на другое устройство или режим и обратно",
     typeCelebrations: "Достижения и праздники",
     typeCelebrationsHint: "Достижения библиотеки, завершённые плейлисты и другие праздники",
+    batchWaitLabel: "Как часто показывать: {type}",
+    batchWaitNone: "Показывать сразу",
+    batchWait10s: "Группировать каждые 10 секунд",
+    batchWait1m: "Группировать каждую минуту",
+    batchWait5m: "Группировать каждые 5 минут",
+    moreCount: {
+      one: "и ещё {count}",
+      few: "и ещё {count}",
+      many: "и ещё {count}",
+      other: "и ещё {count}",
+    },
   },
   osNotification: {
     appUpdated: "Luminous обновлён до v{version}",

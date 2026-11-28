@@ -2418,6 +2418,15 @@ export const de = {
       "Wechsel der Audioausgabe zu einem anderen Gerät oder Modus und wieder zurück",
     typeCelebrations: "Meilensteine und Feiern",
     typeCelebrationsHint: "Mediathek-Meilensteine, beendete Wiedergabelisten und andere Feiern",
+    batchWaitLabel: "Wie oft {type} angezeigt werden",
+    batchWaitNone: "Sofort anzeigen",
+    batchWait10s: "Alle 10 Sekunden bündeln",
+    batchWait1m: "Jede Minute bündeln",
+    batchWait5m: "Alle 5 Minuten bündeln",
+    moreCount: {
+      one: "+{count} weitere",
+      other: "+{count} weitere",
+    },
   },
   osNotification: {
     appUpdated: "Luminous wurde auf v{version} aktualisiert",

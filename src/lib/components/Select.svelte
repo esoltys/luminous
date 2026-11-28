@@ -6,6 +6,7 @@
     onchange: (e: Event & { currentTarget: HTMLSelectElement }) => void;
     id?: string;
     ariaLabel?: string;
+    disabled?: boolean;
     /** Color/spacing classes — the caller owns these; appearance reset and the chevron are always applied here. */
     class?: string;
     /** Right-inset of the chevron icon, matched to the select's own right padding. Defaults to the standard 0.625rem/pr-8 pairing. */
@@ -18,6 +19,7 @@
     onchange,
     id,
     ariaLabel,
+    disabled = false,
     class: className = "",
     chevronPosition = "0.625rem",
     children,
@@ -33,6 +35,7 @@
 <select
   {id}
   aria-label={ariaLabel}
+  {disabled}
   {value}
   {onchange}
   class="appearance-none -webkit-appearance-none {className}"

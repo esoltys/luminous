@@ -2523,6 +2523,15 @@ export const frFR: DeepStringRecord<typeof en> = {
     typePlaybackHint: "Passage de la sortie audio à un autre appareil ou mode, puis retour",
     typeCelebrations: "Étapes et célébrations",
     typeCelebrationsHint: "Étapes de la bibliothèque, playlists terminées et autres célébrations",
+    batchWaitLabel: "Fréquence d'affichage : {type}",
+    batchWaitNone: "Afficher tout de suite",
+    batchWait10s: "Regrouper toutes les 10 secondes",
+    batchWait1m: "Regrouper toutes les minutes",
+    batchWait5m: "Regrouper toutes les 5 minutes",
+    moreCount: {
+      one: "+{count} autre",
+      other: "+{count} autres",
+    },
   },
   osNotification: {
     appUpdated: "Luminous a été mis à jour vers la v{version}",
