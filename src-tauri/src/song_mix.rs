@@ -210,22 +210,23 @@ impl Profile {
             return SIMILAR_ARTIST_BASE + SIMILAR_ARTIST_SPAN * lb_match;
         }
 
-        if !c.genres.is_empty() && !self.genres.is_empty() {
-            let shared = c.genres.iter().filter(|g| self.genres.contains(*g)).count();
-            if shared > 0 {
-                let ratio = (shared as f64 / self.genres.len() as f64).min(1.0);
-                return GENRE_ONLY_BASE + GENRE_ONLY_SPAN * ratio;
-            }
-            return 0.0;
-        }
-
-        if !self.tags.is_empty() {
+        let (shared, total) = if !c.genres.is_empty() && !self.genres.is_empty() {
+            (
+                c.genres.iter().filter(|g| self.genres.contains(*g)).count(),
+                self.genres.len(),
+            )
+        } else if !self.tags.is_empty() {
             let cand_tags: HashSet<&String> = pool.tags_for(c).collect();
-            let shared = cand_tags.iter().filter(|t| self.tags.contains(**t)).count();
-            if shared > 0 {
-                let ratio = (shared as f64 / self.tags.len() as f64).min(1.0);
-                return GENRE_ONLY_BASE + GENRE_ONLY_SPAN * ratio;
-            }
+            (
+                cand_tags.iter().filter(|t| self.tags.contains(**t)).count(),
+                self.tags.len(),
+            )
+        } else {
+            (0, 0)
+        };
+        if shared > 0 && total > 0 {
+            let ratio = (shared as f64 / total as f64).min(1.0);
+            return GENRE_ONLY_BASE + GENRE_ONLY_SPAN * ratio;
         }
 
         0.0
@@ -297,11 +298,11 @@ pub struct MixOptions<'a> {
 ///
 /// Never returns a seed song (other than the lead) or an excluded song, and
 /// never more than `tuning.max_per_artist` songs by one artist, counting the
-/// lead. Matching songs come first, drawn at random with probability
-/// proportional to `song_weight`, so every call differs and strong matches
-/// usually, but not always, lead. Unmatched eligible songs follow in random
-/// order, then deferred recent plays. Returns fewer than `limit` only when no
-/// eligible song is left under its artist's cap.
+/// lead. Matching songs come first, drawn at random weighted by artist tier
+/// and song fit, so every call differs and strong matches usually, but not
+/// always, lead. Unmatched eligible songs follow in random order, then
+/// deferred recent plays. Returns fewer than `limit` only when no eligible
+/// song is left under its artist's cap.
 pub fn pick(
     profile: &Profile,
     pool: &Pool,
