@@ -141,7 +141,10 @@ impl PlaylistManager {
         song_ids: &[i64],
     ) -> Result<Vec<PlaylistItem>> {
         let mut conn = self.db.pool.get()?;
-        let tx = conn.transaction()?;
+        // Acquire the write lock up front: a deferred transaction that reads
+        // MAX(position) before inserting fails immediately with SQLITE_BUSY
+        // (bypassing `busy_timeout`) if another writer is active.
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         let max_pos: i32 = tx.query_row(
             "SELECT COALESCE(MAX(position), -1) FROM playlist_items WHERE playlist_id = ?1",
             params![playlist_id],
