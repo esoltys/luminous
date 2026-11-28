@@ -5,6 +5,8 @@ import SettingsGeneral from "./SettingsGeneral.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { i18n } from "../stores/i18n.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { toastStore } from "../stores/toast.svelte";
+import { tick } from "svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
@@ -79,6 +81,42 @@ describe("SettingsGeneral.svelte", () => {
         calls.indexOf("sync_all_auto_playlists"),
       );
       prefs.autoPlaylists.decade = true;
+    });
+  });
+
+  describe("notification batching waits (#2424)", () => {
+    beforeEach(() => {
+      toastStore.preferences = {};
+      toastStore.batchWaits = {};
+    });
+
+    it("offers a wait only for library changes, devices and playback", () => {
+      const { getAllByLabelText } = render(SettingsGeneral);
+      const labels = getAllByLabelText(/^How often to show /).map((el) =>
+        el.getAttribute("aria-label"),
+      );
+      expect(labels).toEqual([
+        "How often to show Library changes",
+        "How often to show Devices and sync",
+        "How often to show Playback and audio output",
+      ]);
+    });
+
+    it("saves a picked wait and disables it while the type is off", async () => {
+      const { getByLabelText } = render(SettingsGeneral);
+      const wait = getByLabelText("How often to show Devices and sync") as HTMLSelectElement;
+      expect(wait.value).toBe("0");
+
+      await fireEvent.change(wait, { target: { value: "60" } });
+      expect(toastStore.batchWaitFor("devices")).toBe(60);
+      expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+        key: "notification_batch_waits",
+        value: JSON.stringify({ devices: 60 }),
+      });
+
+      toastStore.setPreference("devices", "off");
+      await tick();
+      expect(wait).toBeDisabled();
     });
   });
 });

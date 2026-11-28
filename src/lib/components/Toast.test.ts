@@ -283,4 +283,19 @@ describe("Toast.svelte", () => {
       expect(navigationStore.settingsSubTab).toBe("general");
     });
   });
+
+  it("says how many grouped notifications a toast stands for", async () => {
+    toastStore.batchWaits = { devices: 10 };
+    const devices = toastStore.channel("devices");
+    devices.show("Walkman connected", "success");
+    devices.show("Walkman synced", "success");
+    devices.show("Walkman ejected", "success");
+
+    render(Toast);
+    await tick();
+
+    expect(screen.getByText("Walkman ejected")).toBeInTheDocument();
+    expect(screen.getByText("+2 more")).toBeInTheDocument();
+    toastStore.batchWaits = {};
+  });
 });
