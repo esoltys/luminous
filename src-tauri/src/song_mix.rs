@@ -471,18 +471,21 @@ fn spread_artists(
         // can't take. That's still arrangeable iff `g` has at most
         // floor(slots_after / 2) songs left and every other artist at most
         // ceil(slots_after / 2). Unkeyed groups hold one song, so only keyed
-        // groups can break this.
+        // groups can break this, and only the two with the most songs left
+        // need checking, which keeps each slot linear in the artist count.
+        let (mut most, mut runner_up) = ((usize::MAX, 0), 0);
+        for (gi, g) in groups.iter().enumerate().filter(|(_, g)| g.key.is_some()) {
+            if g.left() > most.1 {
+                runner_up = most.1;
+                most = (gi, g.left());
+            } else if g.left() > runner_up {
+                runner_up = g.left();
+            }
+        }
         let keeps_order_possible = |gi: usize| {
-            groups.iter().enumerate().all(|(hi, h)| {
-                if h.key.is_none() {
-                    return true;
-                }
-                if hi == gi {
-                    h.left() - 1 <= slots_after / 2
-                } else {
-                    h.left() <= slots_after.div_ceil(2)
-                }
-            })
+            let others_most = if gi == most.0 { runner_up } else { most.1 };
+            let own_ok = groups[gi].key.is_none() || groups[gi].left() - 1 <= slots_after / 2;
+            own_ok && others_most <= slots_after.div_ceil(2)
         };
         let next_song = |g: &Group| g.songs[g.placed].0;
         let open = || {
