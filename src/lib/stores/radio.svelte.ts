@@ -193,6 +193,8 @@ class RadioStore {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private initialized = false;
   private savedLoaded = false;
+  /** True while `syncDirectory()` is awaiting `sync_radio_directory`, so the `done`
+   * progress event doesn't pre-empt `syncDirectory()`'s richer completion count. */
   private syncCallInFlight = false;
 
   get subView(): RadioSubView {
@@ -251,16 +253,12 @@ class RadioStore {
     );
   }
 
-  private syncTaskLabel(): string {
-    return this.status?.optedIn ? i18n.t("radio.refreshingIndex") : i18n.t("radio.syncingIndex");
-  }
-
   private ensureSyncTaskStarted() {
     if (!tasksStore.isTaskActive(RADIO_SYNC_TASK_ID)) {
-      tasksStore.startTask({
-        id: RADIO_SYNC_TASK_ID,
-        label: this.syncTaskLabel(),
-      });
+      const label = this.status?.optedIn
+        ? i18n.t("radio.refreshingIndex")
+        : i18n.t("radio.syncingIndex");
+      tasksStore.startTask({ id: RADIO_SYNC_TASK_ID, label });
     }
   }
 
@@ -393,10 +391,7 @@ class RadioStore {
     this.syncing = true;
     this.syncError = null;
     this.syncProgress = { mode: "full", fetchedStations: 0, page: 1, done: false };
-    tasksStore.startTask({
-      id: RADIO_SYNC_TASK_ID,
-      label: this.syncTaskLabel(),
-    });
+    this.ensureSyncTaskStarted();
     try {
       const stats = await invoke<RadioDirectorySyncStats>("sync_radio_directory");
       const completedLabel =
