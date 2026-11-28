@@ -55,7 +55,7 @@ pub struct AutoContinueSeed {
     /// doesn't open with its artist (#2441). Taken from the play order
     /// rather than the Queue's last row, which differs under shuffle or with
     /// a Play Next song pending.
-    pub last_song_id: i64,
+    pub song_before_batch: i64,
 }
 
 fn mix_options(now: i64, count: usize, after_artist: Option<&str>) -> MixOptions<'_> {
@@ -78,14 +78,14 @@ pub fn select_songs(
     count: usize,
     rng: &mut impl rand::Rng,
 ) -> Result<Vec<i64>> {
-    // Loaded through `song_mix` so the last song's artist key follows the
-    // same rule as every candidate's.
-    let last = song_mix::load_by_ids(conn, &[seed.last_song_id])?.pop();
+    // The song before the batch is loaded through `song_mix` so its artist
+    // key follows the same rule as every candidate's.
+    let before = song_mix::load_by_ids(conn, &[seed.song_before_batch])?.pop();
     let seeds = song_mix::load_by_ids(conn, &seed.song_ids)?;
     let mut pool = Pool::load(conn)?;
     pool.exclude_songs(exclude_ids.iter().copied());
     let profile = Profile::from_seeds(&seeds, &pool);
-    let after_artist = last.as_ref().and_then(|c| c.artist_key.as_deref());
+    let after_artist = before.as_ref().and_then(|c| c.artist_key.as_deref());
     Ok(song_mix::pick(
         &profile,
         &pool,

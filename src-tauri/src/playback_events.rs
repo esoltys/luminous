@@ -1033,7 +1033,7 @@ mod tests {
                 RecordedCall::AutoContinue(AutoContinueSeed {
                     playlist_id: 7,
                     song_ids: vec![1],
-                    last_song_id: 2,
+                    song_before_batch: 2,
                 }),
             ]
         );
@@ -1112,7 +1112,7 @@ mod tests {
                 RecordedCall::AutoContinue(AutoContinueSeed {
                     playlist_id: 7,
                     song_ids: vec![2, 1],
-                    last_song_id: 2,
+                    song_before_batch: 2,
                 }),
             ]
         );

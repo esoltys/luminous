@@ -1410,7 +1410,7 @@ impl Player {
         Some(crate::continue_mix::AutoContinueSeed {
             playlist_id,
             song_ids,
-            last_song_id: self.order.last_song_ahead().unwrap_or(song.id),
+            song_before_batch: self.order.song_before_appended(song.id),
         })
     }
 
@@ -1698,7 +1698,7 @@ mod tests {
             Some(crate::continue_mix::AutoContinueSeed {
                 playlist_id: 7,
                 song_ids: vec![4, 3, 2],
-                last_song_id: 5,
+                song_before_batch: 5,
             })
         );
 
