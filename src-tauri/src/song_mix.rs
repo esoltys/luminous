@@ -296,6 +296,11 @@ pub struct MixOptions<'a> {
     pub lead_with_seed: bool,
     /// Current unix timestamp (seconds) used for recent-play decay.
     pub now: i64,
+    /// Artist key of the song that plays just before the mix, so it doesn't
+    /// open with that artist when another order exists. Ignored with
+    /// `lead_with_seed`: the lead then sits directly before the rest and its
+    /// artist counts instead.
+    pub after_artist: Option<&'a str>,
     pub tuning: &'a Tuning,
 }
 
@@ -317,7 +322,8 @@ pub struct MixOptions<'a> {
 ///
 /// Play order is independent of draw order: the lead stays at index 0 and
 /// each artist's songs are spread evenly through the rest, never two in a
-/// row unless the picked songs leave no other arrangement.
+/// row (counting the lead, or else `opts.after_artist`, as the song before)
+/// unless the picked songs leave no other arrangement.
 pub fn pick(
     profile: &Profile,
     pool: &Pool,
@@ -391,7 +397,11 @@ pub fn pick(
 
     let mut ids = Vec::with_capacity(limit);
     ids.extend(lead.map(|(id, _)| id));
-    ids.extend(spread_artists(&picked, lead.and_then(|(_, key)| key), rng));
+    let before = match lead {
+        Some((_, key)) => key,
+        None => opts.after_artist,
+    };
+    ids.extend(spread_artists(&picked, before, rng));
     ids
 }
 
@@ -725,6 +735,7 @@ mod tests {
             limit,
             lead_with_seed: false,
             now: NOW,
+            after_artist: None,
             tuning: &TUNING,
         }
     }
@@ -1188,6 +1199,63 @@ mod tests {
             let picked = pick_with(&seeds, &pool(lib.clone()), &lead, seed);
             assert_eq!(picked[0], 1);
             assert_eq!(repeats(&picked, &artist_of, None), 0, "{picked:?}");
+        }
+    }
+
+    #[test]
+    fn mix_never_opens_with_the_artist_just_before_it() {
+        // An Auto Continue batch: the seed artist scores highest and gets
+        // two of the five slots, so without `after_artist` it often opens.
+        let seeds = [song(1, "Seed", &["Rock"], 1980, 120.0)];
+        let lib = [catalogue(10, 30, "Seed", "Rock"), singles(300, 20, "Rock")].concat();
+        let artist_of: HashMap<i64, &str> = lib
+            .iter()
+            .map(|c| (c.id, c.artist_key.as_deref().unwrap()))
+            .collect();
+        let after = MixOptions {
+            after_artist: Some("seed"),
+            ..opts(5)
+        };
+        for seed in 0..100 {
+            let picked = pick_with(&seeds, &pool(lib.clone()), &after, seed);
+            assert_eq!(picked.len(), 5);
+            assert_eq!(
+                repeats(&picked, &artist_of, Some("seed")),
+                0,
+                "seed {seed}: {picked:?}"
+            );
+        }
+
+        // Only that artist left: repeats are unavoidable, and still used.
+        let only = catalogue(10, 3, "Seed", "Rock");
+        assert_eq!(pick_with(&seeds, &pool(only), &after, 7).len(), 3);
+    }
+
+    #[test]
+    fn lead_takes_the_place_of_after_artist() {
+        // Radio leads with its seed; an `after_artist` set alongside must not
+        // change the mix.
+        let seeds = [song(1, "Seed", &["Rock"], 1980, 120.0)];
+        let lib = [
+            catalogue(10, 30, "Seed", "Rock"),
+            catalogue(100, 30, "Big", "Rock"),
+            singles(300, 20, "Rock"),
+        ]
+        .concat();
+        let lead = MixOptions {
+            lead_with_seed: true,
+            ..opts(12)
+        };
+        let both = MixOptions {
+            after_artist: Some("big"),
+            ..lead
+        };
+        for seed in 0..20 {
+            let p = pool(lib.clone());
+            assert_eq!(
+                pick_with(&seeds, &p, &lead, seed),
+                pick_with(&seeds, &p, &both, seed)
+            );
         }
     }
 

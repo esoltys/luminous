@@ -261,6 +261,22 @@ impl PlayOrder {
         Some(seeds)
     }
 
+    /// The song that would play last if playback ran on from here, and so
+    /// right before anything `append`ed now: the last playable item ahead in
+    /// the active order (appends go to its end, shuffled or not), else the
+    /// last playable Play Next item (those play before the order resumes).
+    /// `current_song_id` when nothing playable is ahead.
+    pub(crate) fn song_before_appended(&self, current_song_id: i64) -> i64 {
+        let ahead = self.current_index.map_or(0, |i| i + 1);
+        (ahead..self.virtual_len())
+            .rev()
+            .filter_map(|v| self.items.get(self.resolve_item_index(v)?))
+            .chain(self.play_next.iter().rev())
+            .find(|item| Self::is_item_playable(item))
+            .and_then(|item| item.song.as_ref().map(|s| s.id))
+            .unwrap_or(current_song_id)
+    }
+
     /// Number of virtual indices in whichever order is currently active:
     /// `shuffle_order` while shuffling, `items` otherwise.
     pub(crate) fn virtual_len(&self) -> usize {
@@ -1051,5 +1067,44 @@ mod tests {
 
         assert_eq!(advance_manual(&mut order), Some(11));
         assert!(order.play_next_mut().is_empty());
+    }
+
+    #[test]
+    fn song_before_appended_is_the_last_song_ahead() {
+        let songs =
+            |ids: &[i64]| make_items(ids.iter().map(|&i| make_song(i, None, false)).collect());
+
+        // Straight order: the last row.
+        let mut order = PlayOrder::new(
+            songs(&[1, 2, 3]),
+            Some(1),
+            ShuffleMode::Off,
+            RepeatMode::Off,
+        );
+        assert_eq!(order.song_before_appended(99), 3);
+
+        // Shuffled: the last entry of the shuffled order, not the last row.
+        order.set_shuffle_mode(ShuffleMode::All);
+        order.set_shuffle_order(vec![0, 2, 1]);
+        order.set_current_index(Some(1));
+        assert_eq!(order.song_before_appended(99), 2);
+
+        // Nothing left in the order: a pending Play Next song plays last.
+        order.set_current_index(Some(2));
+        assert_eq!(
+            order.song_before_appended(99),
+            99,
+            "the current song is last"
+        );
+        let next = |id| PlaylistItem::new_song(0, 0, make_song(id, None, false));
+        order.play_next_mut().push_back(next(10));
+        order.play_next_mut().push_back(next(11));
+        assert_eq!(order.song_before_appended(99), 11);
+
+        // Unplayable songs ahead are skipped, as playback skips them.
+        let mut items = songs(&[1, 2]);
+        items.push(PlaylistItem::new_song(0, 2, make_song(3, None, true)));
+        let order = PlayOrder::new(items, Some(0), ShuffleMode::Off, RepeatMode::Off);
+        assert_eq!(order.song_before_appended(99), 2);
     }
 }

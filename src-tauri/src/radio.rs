@@ -26,6 +26,7 @@ fn mix_options(limit: usize, now: i64) -> MixOptions<'static> {
         limit,
         lead_with_seed: true,
         now,
+        after_artist: None,
         tuning: &TUNING,
     }
 }
