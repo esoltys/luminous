@@ -108,6 +108,18 @@ export function notificationTypeHint(type: NotificationType): string {
   return i18n.t(TYPE_TEXT_KEYS[type].hint);
 }
 
+const BATCH_WAIT_TEXT_KEYS: Record<BatchWaitSeconds, string> = {
+  0: "notifications.batchWaitNone",
+  10: "notifications.batchWait10s",
+  60: "notifications.batchWait1m",
+  300: "notifications.batchWait5m",
+};
+
+/** Localised name of a batching wait, e.g. "Group every minute". */
+export function batchWaitLabel(seconds: BatchWaitSeconds): string {
+  return i18n.t(BATCH_WAIT_TEXT_KEYS[seconds]);
+}
+
 interface ToastAction {
   label: string;
   onClick: () => void;
@@ -189,6 +201,7 @@ class ToastStore {
 
   /** Set how long `type` waits to group notifications, reschedule what it holds, and save it. */
   setBatchWait(type: NotificationType, seconds: BatchWaitSeconds) {
+    if (!BATCHABLE_TYPES.includes(type)) return;
     this.batchWaits = { ...this.batchWaits, [type]: seconds };
     for (const pending of this.pendingReports.values()) {
       if (pending.type === type) this.schedule(pending);
@@ -239,28 +252,25 @@ class ToastStore {
     );
   }
 
-  /** Whether a plain toast like this may fold into, or absorb, others of its type. */
-  private mergeWindow(
+  /**
+   * Show a channel toast. While `type` has a batching wait, a plain toast (no link,
+   * action, error or warning) folds into the newest one still inside its wait, which
+   * takes the new text and counts one more ("+N more"); the returned id is that toast's.
+   */
+  private showPlain(
     type: NotificationType,
-    variant: ToastVariant,
-    url?: string,
-    action?: ToastAction,
-  ): { mergeableUntil?: number } {
-    const waitMs = this.batchWaitFor(type) * 1000;
-    if (waitMs === 0 || url || action || variant === "error" || variant === "warning") return {};
-    return { mergeableUntil: Date.now() + waitMs };
-  }
-
-  /** Fold a plain toast into the newest open one of its type ("+N more"); returns its id, or null. */
-  private mergeInto(
-    type: NotificationType,
-    text: string,
-    variant: ToastVariant,
+    fields: Pick<ToastMessage, "text" | "variant" | "url" | "action">,
     durationMs?: number,
-    url?: string,
-    action?: ToastAction,
-  ): number | null {
-    if (!this.mergeWindow(type, variant, url, action).mergeableUntil) return null;
+  ): number {
+    const waitMs = this.batchWaitFor(type) * 1000;
+    const foldable =
+      waitMs > 0 &&
+      !fields.url &&
+      !fields.action &&
+      fields.variant !== "error" &&
+      fields.variant !== "warning";
+    if (!foldable) return this.add(type, fields, durationMs);
+
     const now = Date.now();
     const target = this.messages.findLast(
       (m) =>
@@ -269,9 +279,9 @@ class ToastStore {
         m.mergeableUntil !== undefined &&
         m.mergeableUntil > now,
     );
-    if (!target) return null;
-    target.text = text;
-    target.variant = variant;
+    if (!target) return this.add(type, { ...fields, mergeableUntil: now + waitMs }, durationMs);
+    target.text = fields.text;
+    target.variant = fields.variant;
     target.moreCount = (target.moreCount ?? 0) + 1;
     target.requestedDurationMs = durationMs;
     this.applyPolicy(target);
@@ -282,12 +292,7 @@ class ToastStore {
   channel(type: NotificationType): ToastChannel {
     return {
       show: (text, variant = "info", durationMs, url, action) =>
-        this.mergeInto(type, text, variant, durationMs, url, action) ??
-        this.add(
-          type,
-          { text, variant, url, action, ...this.mergeWindow(type, variant, url, action) },
-          durationMs,
-        ),
+        this.showPlain(type, { text, variant, url, action }, durationMs),
       report: (kind, count = 1) => this.report(type, kind, count),
       startBatch: (text, variant = "info") => this.add(type, { text, variant }),
       finishBatch: (id, text, variant = "success", durationMs = TOAST_DURATION_MS) => {
@@ -362,11 +367,15 @@ class ToastStore {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       // A choice the user made while this was loading is newer than the saved one.
       this.preferences = {
-        ...parsePreferences(settings?.[PREFERENCES_SETTING_KEY]),
+        ...parseTypeMap(
+          settings?.[PREFERENCES_SETTING_KEY],
+          NOTIFICATION_TYPES,
+          NOTIFICATION_PREFERENCES,
+        ),
         ...this.preferences,
       };
       this.batchWaits = {
-        ...parseBatchWaits(settings?.[BATCH_WAITS_SETTING_KEY]),
+        ...parseTypeMap(settings?.[BATCH_WAITS_SETTING_KEY], BATCHABLE_TYPES, BATCH_WAIT_OPTIONS_S),
         ...this.batchWaits,
       };
       for (const pending of this.pendingReports.values()) this.schedule(pending);
@@ -644,10 +653,15 @@ export function followsPreferences(msg: ToastMessage): boolean {
   );
 }
 
-/** Read the saved preference map, dropping unknown types and values (they mean `default`). */
-function parsePreferences(
+/**
+ * Read a saved per-type map (preferences or batching waits), keeping only entries whose
+ * type is in `types` and whose value is in `values`; anything else means "not set".
+ */
+function parseTypeMap<V>(
   raw: string | undefined,
-): Partial<Record<NotificationType, NotificationPreference>> {
+  types: readonly NotificationType[],
+  values: readonly V[],
+): Partial<Record<NotificationType, V>> {
   if (!raw) return {};
   let parsed: unknown;
   try {
@@ -656,37 +670,10 @@ function parsePreferences(
     return {};
   }
   if (!parsed || typeof parsed !== "object") return {};
-  const result: Partial<Record<NotificationType, NotificationPreference>> = {};
-  for (const [type, preference] of Object.entries(parsed)) {
-    if (
-      NOTIFICATION_TYPES.includes(type as NotificationType) &&
-      NOTIFICATION_PREFERENCES.includes(preference as NotificationPreference)
-    ) {
-      result[type as NotificationType] = preference as NotificationPreference;
-    }
-  }
-  return result;
-}
-
-/** Read the saved batching waits, dropping unbatchable types and unknown values. */
-function parseBatchWaits(
-  raw: string | undefined,
-): Partial<Record<NotificationType, BatchWaitSeconds>> {
-  if (!raw) return {};
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return {};
-  }
-  if (!parsed || typeof parsed !== "object") return {};
-  const result: Partial<Record<NotificationType, BatchWaitSeconds>> = {};
-  for (const [type, seconds] of Object.entries(parsed)) {
-    if (
-      BATCHABLE_TYPES.includes(type as NotificationType) &&
-      BATCH_WAIT_OPTIONS_S.includes(seconds as BatchWaitSeconds)
-    ) {
-      result[type as NotificationType] = seconds as BatchWaitSeconds;
+  const result: Partial<Record<NotificationType, V>> = {};
+  for (const [type, value] of Object.entries(parsed)) {
+    if (types.includes(type as NotificationType) && values.includes(value as V)) {
+      result[type as NotificationType] = value as V;
     }
   }
   return result;

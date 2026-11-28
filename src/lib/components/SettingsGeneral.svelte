@@ -18,15 +18,10 @@
     type NotificationPreference,
     BATCHABLE_TYPES,
     BATCH_WAIT_OPTIONS_S,
+    batchWaitLabel,
     type BatchWaitSeconds,
   } from "../stores/toast.svelte";
 
-  const BATCH_WAIT_LABEL_KEYS: Record<BatchWaitSeconds, string> = {
-    0: "notifications.batchWaitNone",
-    10: "notifications.batchWait10s",
-    60: "notifications.batchWait1m",
-    300: "notifications.batchWait5m",
-  };
   const SELECT_CLASS =
     "shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium disabled:opacity-50 disabled:hover:border-brand-border";
 
@@ -182,7 +177,7 @@
             class={SELECT_CLASS}
           >
             {#each BATCH_WAIT_OPTIONS_S as seconds (seconds)}
-              <option value={String(seconds)}>{i18n.t(BATCH_WAIT_LABEL_KEYS[seconds])}</option>
+              <option value={String(seconds)}>{batchWaitLabel(seconds)}</option>
             {/each}
           </Select>
         {/if}
