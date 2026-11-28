@@ -276,31 +276,31 @@ fn prune_stale_logs(app_data_dir: &Path, now: jiff::Timestamp) {
 /// server/share names, or track/album metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagnosticsEnvironment {
-    pub schema_version: i32,
-    pub watched_folders: Option<WatchedFolderCounts>,
-    pub background_reads: Option<BackgroundReadFlags>,
-    pub library_counts: Option<LibraryCounts>,
+    schema_version: i32,
+    watched_folders: Option<WatchedFolderCounts>,
+    background_reads: Option<BackgroundReadFlags>,
+    library_counts: Option<LibraryCounts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WatchedFolderCounts {
-    pub local: usize,
-    pub network: usize,
+struct WatchedFolderCounts {
+    local: usize,
+    network: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BackgroundReadFlags {
-    pub loudness: bool,
-    pub tempo_key: bool,
-    pub provenance: bool,
-    pub integrity: bool,
+struct BackgroundReadFlags {
+    loudness: bool,
+    tempo_key: bool,
+    provenance: bool,
+    integrity: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LibraryCounts {
-    pub songs: i64,
-    pub albums: i64,
-    pub unavailable: i64,
+struct LibraryCounts {
+    songs: i64,
+    albums: i64,
+    unavailable: i64,
 }
 
 fn is_network_path(path: &str) -> bool {
@@ -338,11 +338,13 @@ impl DiagnosticsEnvironment {
             })
             .ok();
 
+        let verification_enabled =
+            crate::commands::settings::background_verification_enabled(&conn);
         let background_reads = Some(BackgroundReadFlags {
             loudness: crate::loudness::is_enabled(&conn),
             tempo_key: crate::musical::detection_enabled(&conn),
-            provenance: crate::commands::settings::background_verification_enabled(&conn),
-            integrity: crate::commands::settings::background_verification_enabled(&conn),
+            provenance: verification_enabled,
+            integrity: verification_enabled,
         });
 
         let library_counts = conn

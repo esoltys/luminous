@@ -123,8 +123,7 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
         // into loudness normalization — otherwise this would decode the
         // entire library (slow and disk-heavy on external drives) for a
         // feature that's off by default and never gets used.
-        let enabled = settings_on(conn).map(|s| s.enabled).unwrap_or(false);
-        if !enabled {
+        if !is_enabled(conn) {
             return Ok(None);
         }
         conn.query_row(
