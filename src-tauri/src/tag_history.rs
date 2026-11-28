@@ -958,11 +958,9 @@ pub fn restore_song_tags(
     // 4. Capture snapshot before updating SQLite
     let before = snapshot_by_id(conn, song_id).map_err(|e| e.to_string())?;
 
-    let (new_mtime, new_filesize) = if on_disk {
-        file_mtime_and_size(file_path)
-    } else {
-        (None, None)
-    };
+    if on_disk {
+        crate::db::record_tag_write(conn, file_path);
+    }
 
     let album_artist_trimmed = album_artist.trim();
     let artist_trimmed = artist.trim();
@@ -1007,10 +1005,8 @@ pub fn restore_song_tags(
             compilation = ?21,
             comment = ?22,
             album_key = ?23,
-            language = ?24,
-            mtime = COALESCE(?25, mtime),
-            filesize = COALESCE(?26, filesize)
-         WHERE id = ?27",
+            language = ?24
+         WHERE id = ?25",
         rusqlite::params![
             title,
             titlesort,
@@ -1036,8 +1032,6 @@ pub fn restore_song_tags(
             comment,
             album_key,
             language,
-            new_mtime,
-            new_filesize,
             song_id,
         ],
     )

@@ -6,6 +6,7 @@
 pub mod audio;
 pub mod cue;
 pub mod dr;
+mod flac_write;
 pub mod playlist;
 pub mod sanitize;
 pub mod values;

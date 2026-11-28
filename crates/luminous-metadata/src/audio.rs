@@ -830,7 +830,7 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
 
     sanitize_tag_languages(tag);
 
-    save_tagged_file_with_retry(&tagged_file, path, "write tags")
+    save_tags_to_path(path, "write tags", &tagged_file)
 }
 
 /// Sanitizes all language-bearing tag items in `tag` before saving to disk.
@@ -880,13 +880,47 @@ pub fn format_error_chain(err: &dyn std::error::Error) -> String {
     parts.join(": ")
 }
 
-fn save_tagged_file_with_retry(
-    tagged_file: &lofty::file::TaggedFile,
-    path: &Path,
-    action: &str,
-) -> Result<()> {
-    save_with_retry(path, action, || {
-        tagged_file.save_to_path(path, WriteOptions::default())
+/// Something lofty can save into a file: a whole [`TaggedFile`] or one tag
+/// (see [`TagSave`]).
+///
+/// [`TaggedFile`]: lofty::file::TaggedFile
+pub(crate) trait LoftySave {
+    fn save_into<F: lofty::io::FileLike>(&self, file: &mut F) -> std::io::Result<()>;
+}
+
+impl LoftySave for lofty::file::TaggedFile {
+    fn save_into<F: lofty::io::FileLike>(&self, file: &mut F) -> std::io::Result<()> {
+        self.save_to(file, WriteOptions::default())
+            .map_err(std::io::Error::other)
+    }
+}
+
+/// Saves a single tag through [`LoftySave`]. A wrapper rather than an impl
+/// for every `T: TagExt`, which Rust rejects next to the `TaggedFile` impl
+/// because lofty could one day make `TaggedFile` a `TagExt`.
+pub(crate) struct TagSave<'a, T>(pub &'a T);
+
+impl<T: lofty::tag::TagExt> LoftySave for TagSave<'_, T> {
+    fn save_into<F: lofty::io::FileLike>(&self, file: &mut F) -> std::io::Result<()> {
+        self.0
+            .save_to(file, WriteOptions::default())
+            .map_err(std::io::Error::other)
+    }
+}
+
+/// Saves `tags` to the file at `path`, retrying as [`save_with_retry`] does.
+///
+/// Every tag write goes through here so FLAC files are saved by
+/// [`crate::flac_write`], which keeps the audio frames in place instead of
+/// moving them on every edit that changes the tags' length (#2426). Other
+/// formats, and FLAC files it can't parse, get lofty's own save.
+pub(crate) fn save_tags_to_path(path: &Path, action: &str, tags: &impl LoftySave) -> Result<()> {
+    save_with_retry(path, action, || -> std::io::Result<()> {
+        let mut file = std::fs::File::options().read(true).write(true).open(path)?;
+        if crate::flac_write::save_if_flac(&mut file, |region| tags.save_into(region))? {
+            return Ok(());
+        }
+        tags.save_into(&mut file)
     })
 }
 
@@ -941,7 +975,7 @@ pub fn clear_embedded_art(path: &Path) -> Result<()> {
 
     sanitize_tag_languages(tag);
 
-    save_tagged_file_with_retry(&tagged_file, path, "clear embedded art")
+    save_tags_to_path(path, "clear embedded art", &tagged_file)
 }
 
 #[cfg(test)]
@@ -1062,6 +1096,109 @@ mod tests {
         write_test_wav(&path);
 
         clear_embedded_art(&path).expect("clearing an untagged file should not error");
+    }
+
+    /// Asserts the file at `path` is `header_len` bytes of metadata followed
+    /// by exactly the fixture's audio frames, untouched.
+    fn assert_audio_at(path: &Path, header_len: u64, audio_len: usize) {
+        let bytes = std::fs::read(path).unwrap();
+        assert_eq!(bytes.len() as u64, header_len + audio_len as u64);
+        assert_eq!(
+            &bytes[header_len as usize..],
+            &crate::flac_write::fixture::audio_bytes(audio_len)[..]
+        );
+    }
+
+    fn genre_request(genre: &str) -> TagWriteRequest<'_> {
+        TagWriteRequest {
+            title: "Title",
+            artist: "Artist",
+            album: "Album",
+            genre,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_write_tags_on_padded_flac_keeps_audio_in_place() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("padded.flac");
+        let audio_len = 300_000;
+        let audio_start = crate::flac_write::fixture::write_flac(&path, Some(4096), audio_len);
+
+        write_tags(&path, &genre_request("Rock")).expect("first write");
+        assert_audio_at(&path, audio_start, audio_len);
+
+        // A longer value must come out of the padding, not move the frames (#2426).
+        write_tags(&path, &genre_request("Progressive Symphonic Metal")).expect("longer write");
+        assert_audio_at(&path, audio_start, audio_len);
+        assert_eq!(
+            read_tags(&path).unwrap().genre.as_deref(),
+            Some("Progressive Symphonic Metal")
+        );
+
+        write_tags(&path, &genre_request("Pop")).expect("shorter write");
+        assert_audio_at(&path, audio_start, audio_len);
+        assert_eq!(read_tags(&path).unwrap().genre.as_deref(), Some("Pop"));
+    }
+
+    #[test]
+    fn test_flac_tag_and_art_edits_leave_real_frames_untouched() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.flac");
+        std::fs::copy(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../src-tauri/tests/fixtures/audio/song_gamma.flac"),
+            &path,
+        )
+        .unwrap();
+        let frames_before = {
+            let bytes = std::fs::read(&path).unwrap();
+            let mut f = std::fs::File::open(&path).unwrap();
+            let start = crate::flac_write::frames_start(&mut f);
+            bytes[start as usize..].to_vec()
+        };
+
+        let mut tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag_mut().unwrap();
+        tag.push_picture(
+            Picture::unchecked(vec![0xFF; 20_000])
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Jpeg)
+                .build(),
+        );
+        save_tags_to_path(&path, "add art", &tagged_file).unwrap();
+        write_tags(&path, &genre_request("Progressive Symphonic Metal")).unwrap();
+        clear_embedded_art(&path).unwrap();
+
+        let bytes = std::fs::read(&path).unwrap();
+        let mut f = std::fs::File::open(&path).unwrap();
+        let start = crate::flac_write::frames_start(&mut f);
+        assert_eq!(&bytes[start as usize..], &frames_before[..]);
+        let meta = read_tags(&path).unwrap();
+        assert_eq!(meta.genre.as_deref(), Some("Progressive Symphonic Metal"));
+        assert!(meta.properties.duration_nanosec > 0);
+    }
+
+    #[test]
+    fn test_write_tags_on_unpadded_flac_adds_padding_once() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("unpadded.flac");
+        let audio_len = 300_000;
+        crate::flac_write::fixture::write_flac(&path, None, audio_len);
+
+        // No room: the frames move once, and room is left for later edits.
+        write_tags(&path, &genre_request("Rock")).expect("first write");
+        let len_after_first = std::fs::metadata(&path).unwrap().len();
+        let header_len = len_after_first - audio_len as u64;
+        assert_audio_at(&path, header_len, audio_len);
+
+        write_tags(&path, &genre_request("Progressive Symphonic Metal")).expect("second write");
+        assert_audio_at(&path, header_len, audio_len);
+        assert_eq!(
+            read_tags(&path).unwrap().genre.as_deref(),
+            Some("Progressive Symphonic Metal")
+        );
     }
 
     #[test]

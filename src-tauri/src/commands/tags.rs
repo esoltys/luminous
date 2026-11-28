@@ -487,7 +487,8 @@ async fn rewrite_genre_and_persist(
     // rewritten.
     self_writes.mark_written(metas.iter().map(|m| std::path::PathBuf::from(&m.path)));
 
-    let (updated_count, writes): (u32, Vec<(i64, String)>) =
+    // Each song with its new genre, and the file written for it, if any.
+    let (updated_count, writes): (u32, Vec<(i64, String, Option<std::path::PathBuf>)>) =
         tauri::async_runtime::spawn_blocking(move || {
             let mut count = 0u32;
             let mut writes = Vec::with_capacity(metas.len());
@@ -505,7 +506,7 @@ async fn rewrite_genre_and_persist(
                 // from the same file with just this one's values (#78).
                 if item.source.is_remote() || item.cue_path.is_some() {
                     count += 1;
-                    writes.push((item.id, new_genre));
+                    writes.push((item.id, new_genre, None));
                     continue;
                 }
                 let path = std::path::PathBuf::from(&item.path);
@@ -539,16 +540,20 @@ async fn rewrite_genre_and_persist(
                         language: item.language.as_deref(),
                     },
                 );
-                match write_res {
-                    Ok(_) => count += 1,
+                let written = match write_res {
+                    Ok(_) => {
+                        count += 1;
+                        Some(path)
+                    }
                     Err(ref e) => {
                         log::warn!(
                             "Failed to persist updated genre to disk for song {}: {e:#}",
                             item.id
                         );
+                        None
                     }
-                }
-                writes.push((item.id, new_genre));
+                };
+                writes.push((item.id, new_genre, written));
             }
             (count, writes)
         })
@@ -557,7 +562,10 @@ async fn rewrite_genre_and_persist(
 
     tokio::task::spawn_blocking(move || -> Result<(), String> {
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        for (song_id, new_genre) in &writes {
+        for (song_id, new_genre, written) in &writes {
+            if let Some(path) = written {
+                crate::db::record_tag_write(&tx, path);
+            }
             tx.execute(
                 "UPDATE songs SET genre = ?1 WHERE id = ?2",
                 rusqlite::params![new_genre, song_id],
