@@ -107,6 +107,7 @@ impl Exclusions {
 /// lowercased artist, and what is excluded.
 #[derive(Debug, Default)]
 pub struct Pool {
+    /// One entry per song: `pick` doesn't de-duplicate ids.
     pub candidates: Vec<Candidate>,
     pub artist_tags: HashMap<String, HashSet<String>>,
     pub exclusions: Exclusions,
@@ -270,9 +271,9 @@ pub struct MixOptions<'a> {
 ///
 /// Never returns a seed song (other than the lead) or an excluded song, and
 /// never more than `tuning.max_per_artist` songs by one artist, counting the
-/// lead. Matching songs come first, drawn at random in proportion to how
-/// well they fit, so every call differs and strong matches are likely but
-/// not certain to lead. Unmatched eligible songs follow in random order,
+/// lead. Matching songs come first, drawn at random with each better fit
+/// much more likely to be drawn (see `WEIGHT_SCALE`), so every call differs
+/// and strong matches usually, but not always, lead. Unmatched eligible songs follow in random order,
 /// then deferred recent plays. Returns fewer than `limit` only when no
 /// eligible song is left under its artist's cap.
 pub fn pick(
