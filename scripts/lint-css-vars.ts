@@ -96,16 +96,17 @@ function collectWriters(text: string, into: Set<string>) {
 const BRAND_COLOUR_CLASS =
   /(?<![\w-])(?:bg|text|border(?:-[trblxyse])?|ring(?:-offset)?|outline|fill|stroke|shadow|from|via|to|divide|decoration|accent|caret|placeholder)-(brand-[a-z](?:[a-z-]*[a-z])?)(?![\w-])/g;
 
-function collectThemeColourReads(text: string, file: string, into: Read[]) {
+interface ThemeColourRead {
+  /** The colour as the class spells it (`brand-main`); its token is `--color-${colour}`. */
+  colour: string;
+  file: string;
+  line: number;
+}
+
+function collectThemeColourReads(text: string, file: string, into: ThemeColourRead[]) {
   const rel = path.relative(ROOT, file).replaceAll("\\", "/");
   for (const m of text.matchAll(BRAND_COLOUR_CLASS)) {
-    into.push({
-      name: `--color-${m[1]}`,
-      file: rel,
-      line: lineOf(text, m.index),
-      isPrefix: false,
-      hasFallback: false,
-    });
+    into.push({ colour: m[1], file: rel, line: lineOf(text, m.index) });
   }
 }
 
@@ -141,7 +142,7 @@ function main() {
   const writers = new Set<string>();
   const reads: Read[] = [];
   const themeTokens = new Set<string>();
-  const themeColourReads: Read[] = [];
+  const themeColourReads: ThemeColourRead[] = [];
 
   collectWriters(stripComments(readFileSync(TAILWIND_THEME, "utf8"), TAILWIND_THEME), writers);
   const files = walk(SRC);
@@ -158,7 +159,7 @@ function main() {
     (read.isPrefix ? [...writers].some((w) => w.startsWith(read.name)) : writers.has(read.name));
 
   const broken = reads.filter((r) => !r.hasFallback && !isWritten(r));
-  const brokenClasses = themeColourReads.filter((r) => !themeTokens.has(r.name));
+  const brokenClasses = themeColourReads.filter((r) => !themeTokens.has(`--color-${r.colour}`));
 
   if (reportUnused) {
     // @theme tokens are read by the utilities Tailwind generates from them
@@ -185,8 +186,7 @@ function main() {
     console.error(
       `✖ ${brokenClasses.length} theme-colour class${brokenClasses.length === 1 ? " names" : "es name"} a colour no @theme block defines:`,
     );
-    for (const r of brokenClasses)
-      console.error(`  ${r.file}:${r.line}  ${r.name.replace(/^--color-/, "")}`);
+    for (const r of brokenClasses) console.error(`  ${r.file}:${r.line}  ${r.colour}`);
     console.error(
       "\nTailwind emits no rule for an unknown theme colour, so the element is left transparent. Use a --color-brand-* token from src/app.css.\n",
     );
