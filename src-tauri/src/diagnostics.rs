@@ -276,12 +276,18 @@ fn prune_stale_logs(app_data_dir: &Path, now: jiff::Timestamp) {
 /// Excludes entries older than [`LOG_RETENTION_DAYS`] and caps the combined
 /// bundle at [`MAX_EXPORT_BYTES`], keeping the newest entries.
 pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> String {
-    build_diagnostics_bundle_at(app_data_dir, app_version, jiff::Timestamp::now())
+    build_diagnostics_bundle_at(
+        app_data_dir,
+        app_version,
+        option_env!("BUILD_COMMIT_HASH").unwrap_or(""),
+        jiff::Timestamp::now(),
+    )
 }
 
 fn build_diagnostics_bundle_at(
     app_data_dir: &Path,
     app_version: &str,
+    commit_hash: &str,
     now: jiff::Timestamp,
 ) -> String {
     let path = log_file_path(app_data_dir);
@@ -290,7 +296,11 @@ fn build_diagnostics_bundle_at(
     let mut out = String::new();
     out.push_str("Luminous diagnostics export\n");
     out.push_str(&format!("Generated: {}\n", crate::clock::local_rfc3339()));
-    out.push_str(&format!("App version: {app_version}\n"));
+    if commit_hash.is_empty() {
+        out.push_str(&format!("App version: {app_version}\n"));
+    } else {
+        out.push_str(&format!("App version: {app_version} ({commit_hash})\n"));
+    }
     out.push_str(&format!(
         "OS: {} ({})\n",
         std::env::consts::OS,
@@ -383,6 +393,18 @@ fn build_diagnostics_bundle_at(
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn app_version_line_includes_commit_hash_when_present() {
+        let dir = tempdir().unwrap();
+        let now: jiff::Timestamp = "2026-11-21T13:00:00Z".parse().unwrap();
+
+        let with_hash = build_diagnostics_bundle_at(dir.path(), "4.1.0", "dd2826d6", now);
+        assert!(with_hash.contains("App version: 4.1.0 (dd2826d6)\n"));
+
+        let without_hash = build_diagnostics_bundle_at(dir.path(), "4.1.0", "", now);
+        assert!(without_hash.contains("App version: 4.1.0\n"));
+    }
 
     #[test]
     fn frontend_error_is_appended_and_readable_in_bundle() {
@@ -497,7 +519,7 @@ stack line 2
         std::fs::write(log_dir.join("crash.log.old"), old_content).unwrap();
         std::fs::write(log_dir.join("crash.log"), current_content).unwrap();
 
-        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", now);
+        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", "", now);
         assert!(!bundle.contains("stale error"));
         assert!(!bundle.contains("at old.js:1"));
         assert!(!bundle.contains("just over 7 days"));
@@ -554,7 +576,7 @@ stack line 2
         std::fs::write(log_dir.join("crash.log.old"), old_log).unwrap();
         std::fs::write(log_dir.join("crash.log"), cur_log).unwrap();
 
-        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", now);
+        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", "", now);
         assert!(
             bundle.len() <= MAX_EXPORT_BYTES,
             "Bundle size {} exceeded MAX_EXPORT_BYTES ({MAX_EXPORT_BYTES})",
