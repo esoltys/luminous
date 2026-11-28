@@ -19,7 +19,7 @@ on:
         type: boolean
         default: false
       tag:
-        description: "Release tag to build, e.g. v3.0.0; its source is checked out. Defaults to the version in package.json (and, without linux_only, to the dispatching branch's source)."
+        description: "Release tag to build, e.g. v2026.11.0; its source is checked out. Defaults to the version in package.json (and, without linux_only, to the dispatching branch's source)."
         type: string
         default: ""
 

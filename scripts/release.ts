@@ -1,12 +1,14 @@
 // End-to-end release driver: bumps the version, runs the frontend/backend
 // checks, commits, tags, and (with --push) pushes — then pings Eric's Beeper
 // self-chat with progress if Beeper's local API is running.
-// Usage: bun run scripts/release.ts <version> [--push]
+// Usage: bun run scripts/release.ts [YYYY.M.PATCH] [--push]
+// With no version, the next calendar version is computed (scripts/calver.ts).
 import { Database } from "bun:sqlite";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { resolveReleaseVersion } from "./calver";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,18 +83,19 @@ async function main() {
   const isPushEnabled = args.includes("--push");
   const versionArg = args.find((a) => !a.startsWith("-"));
 
-  if (!versionArg) {
-    console.error("Usage: bun run scripts/release.ts <version> [--push]");
-    console.error("Example: bun run scripts/release.ts 0.31");
+  const currentVersion = JSON.parse(
+    fs.readFileSync(path.join(rootDir, "package.json"), "utf-8"),
+  ).version;
+  let version: string;
+  try {
+    version = resolveReleaseVersion(versionArg, currentVersion, rootDir);
+  } catch (err: any) {
+    console.error(`[Error] ${err.message}`);
+    console.error("Usage: bun run scripts/release.ts [YYYY.M.PATCH] [--push]");
     process.exit(1);
   }
-
-  let version = versionArg;
-  const parts = version.split(".");
-  if (parts.length === 2) {
-    version = `${version}.0`;
-  }
   const tagName = `v${version}`;
+  console.log(`[Release Automation] Releasing ${version} (tag ${tagName})`);
 
   let beeper: any;
   try {

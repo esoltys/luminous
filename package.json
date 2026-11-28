@@ -1,6 +1,6 @@
 {
   "name": "luminous",
-  "version": "4.1.0",
+  "version": "2026.11.1",
   "description": "A high-performance home for the music you already own",
   "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
   "license": "MIT",
@@ -33,6 +33,7 @@
     "test:perf": "vitest run --config vite.perf.config.js",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts",
+    "version:next": "bun run scripts/calver.ts",
     "tauri:windows:build": "tauri-windows-bundle build --runner bun",
     "measure-memory": "bun run scripts/measure-memory.ts",
     "perf:memory": "bun run scripts/perf-memory-scenarios.ts",

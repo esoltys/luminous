@@ -3,7 +3,7 @@ name: landing-page
 description: Update the Luminous landing page (esoltys.dev/luminous/) for a new release — screenshots from the user guide, What's New from the release notes, version, llms.txt — in both EN and FR
 ---
 
-Update the landing page for release $ARGUMENTS (e.g. `2.5.0`; if omitted, use the version in
+Update the landing page for release $ARGUMENTS (e.g. `2026.11.0`; if omitted, use the version in
 `package.json`).
 
 The page lives in a **different repo**: `esoltys/esoltys.github.io`, under `luminous/`. Its
@@ -67,7 +67,7 @@ E
 ## 3. Version
 
 - `luminous/index.html`: the hero badge (`<p class="hero__badge">Version X.Y</p>`) and the
-  JSON-LD `"softwareVersion"`. Use `X.Y` (drop `.0` patch) to match the existing style.
+  JSON-LD `"softwareVersion"`. Use the full `YYYY.M.PATCH` version (e.g. `2026.11.0`): with calendar versions a dropped `.0` would read as a month, not a release.
 - The home page `index.html` shares the `SoftwareApplication` `@id` but has no
   `softwareVersion`; only touch it if its description/operatingSystem became untrue.
 

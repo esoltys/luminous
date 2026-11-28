@@ -1,29 +1,30 @@
 // Bumps the app version across package.json, src-tauri/tauri.conf.json,
-// src-tauri/Cargo.toml, and src-tauri/metainfo/org.luminous.music.metainfo.xml
-// in one shot, so a release doesn't miss one of them.
-// Usage: bun run scripts/bump-version.ts <version>
+// src-tauri/Cargo.toml (+ Cargo.lock), and
+// src-tauri/metainfo/org.luminous.music.metainfo.xml in one shot, so a release
+// doesn't miss one of them. Versions are YYYY.M.PATCH (see scripts/calver.ts);
+// with no argument the next one is computed from today's UTC date and the tags.
+// Usage: bun run scripts/bump-version.ts [YYYY.M.PATCH]
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
+import { resolveReleaseVersion } from "./calver";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
 function main() {
-  const args = process.argv.slice(2);
-  if (args.length < 1) {
-    console.error("Usage: bun run scripts/bump-version.ts <version>");
-    console.error("Example: bun run scripts/bump-version.ts 0.31.0");
+  const currentVersion = JSON.parse(
+    fs.readFileSync(path.join(rootDir, "package.json"), "utf-8"),
+  ).version;
+  let version: string;
+  try {
+    version = resolveReleaseVersion(process.argv[2], currentVersion, rootDir);
+  } catch (err: any) {
+    console.error(`[Error] ${err.message}`);
+    console.error("Usage: bun run scripts/bump-version.ts [YYYY.M.PATCH]");
     process.exit(1);
-  }
-
-  let version = args[0];
-  // Ensure version matches a semver-like format. If they supply 0.31, make it 0.31.0
-  const parts = version.split(".");
-  if (parts.length === 2) {
-    version = `${version}.0`;
   }
 
   console.log(`[Version Bump] Target version: ${version}`);
@@ -106,7 +107,11 @@ function main() {
     console.error(`[Error] metainfo.xml not found at ${metainfoPath}`);
   }
 
-  // 5. Sync bun.lock — package.json's version bump doesn't touch dependency ranges,
+  // 5. Cargo.lock records the app crate's own version; refresh just that entry.
+  console.log("[Version Bump] Syncing Cargo.lock...");
+  execSync("cargo update --workspace --offline", { stdio: "inherit", cwd: rootDir });
+
+  // 6. Sync bun.lock — package.json's version bump doesn't touch dependency ranges,
   // but this keeps the lockfile from silently drifting release over release if it
   // was already stale (e.g. a prior dependency bump that never got a fresh install).
   console.log("[Version Bump] Syncing bun.lock...");
