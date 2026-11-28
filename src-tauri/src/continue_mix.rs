@@ -7,11 +7,12 @@
 //! rather than just the final one. Choosing the songs is `song_mix`'s job;
 //! this module decides when to top up, what seeds it, and appends the batch.
 
+use crate::similar_artists::{self, ArtistSeed};
 use crate::song_mix::{self, MixOptions, Pool, Profile, Tuning};
 use crate::AppState;
 use anyhow::Result;
 use rusqlite::Connection;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 
@@ -62,6 +63,7 @@ pub fn select_songs(
     conn: &Connection,
     seed: &AutoContinueSeed,
     exclude_ids: &HashSet<i64>,
+    similar_artists: HashMap<String, f64>,
     now: i64,
     count: usize,
     rng: &mut impl rand::Rng,
@@ -72,7 +74,8 @@ pub fn select_songs(
     let seeds = song_mix::load_by_ids(conn, &seed.song_ids)?;
     let mut pool = Pool::load(conn)?;
     pool.exclude_songs(exclude_ids.iter().copied());
-    let profile = Profile::from_seeds(&seeds, &pool);
+    let mut profile = Profile::from_seeds(&seeds, &pool);
+    profile.set_similar_artists(similar_artists);
     let after_artist = before.as_ref().and_then(|c| c.artist_key.as_deref());
     Ok(song_mix::pick(
         &profile,
@@ -133,11 +136,38 @@ async fn extend(app: &tauri::AppHandle) -> Result<()> {
         .filter_map(|i| i.song.as_ref().map(|s| s.id))
         .collect();
 
+    let seed_artists = {
+        let song_ids = seed.song_ids.clone();
+        crate::db::run_blocking(&state.db, move |conn| {
+            let seeds = song_mix::load_by_ids(conn, &song_ids)?;
+            Ok(seeds
+                .into_iter()
+                .filter_map(|c| {
+                    c.artist_key.map(|artist_key| ArtistSeed {
+                        artist_key,
+                        musicbrainz_artist_id: c.musicbrainz_artist_id,
+                    })
+                })
+                .collect::<Vec<_>>())
+        })
+        .await?
+    };
+    let similar_artists =
+        similar_artists::resolve_for_seeds(&state.db, &state.similar_artists, seed_artists).await;
+
     let db = state.db.clone();
     let now = crate::clock::unix_now();
     let ids = tokio::task::spawn_blocking(move || {
         let conn = db.pool.get()?;
-        select_songs(&conn, &seed, &in_queue, now, BATCH_SIZE, &mut rand::rng())
+        select_songs(
+            &conn,
+            &seed,
+            &in_queue,
+            similar_artists,
+            now,
+            BATCH_SIZE,
+            &mut rand::rng(),
+        )
     })
     .await??;
     if ids.is_empty() {
@@ -204,5 +234,32 @@ mod tests {
         assert_eq!(picked.len(), 3);
         assert_eq!(picked.iter().filter(|id| (10..16).contains(*id)).count(), 2);
         assert!(picked.contains(&30), "{picked:?}");
+    }
+
+    #[test]
+    fn similar_artists_outrank_genre_only_matches_for_multi_seed_continue() {
+        let seed_a = test_song(1, "Seed A", &["Rock"], Some(1990), Some(120.0));
+        let seed_b = test_song(2, "Seed B", &["Indie"], Some(1992), Some(122.0));
+        let sim_pick = test_song(
+            10,
+            "Similar Artist",
+            &["Electronic"],
+            Some(1991),
+            Some(121.0),
+        );
+        let genre_only = test_song(20, "Genre Only", &["Rock"], Some(1991), Some(121.0));
+        let pool = Pool {
+            candidates: vec![seed_a.clone(), seed_b.clone(), sim_pick, genre_only],
+            ..Default::default()
+        };
+        let mut profile = Profile::from_seeds(&[seed_a, seed_b], &pool);
+        profile.set_similar_artists(HashMap::from([("similar artist".to_string(), 0.9)]));
+        let picked = song_mix::pick(
+            &profile,
+            &pool,
+            &mix_options(NOW, 1, None),
+            &mut StdRng::seed_from_u64(11),
+        );
+        assert_eq!(picked, vec![10]);
     }
 }

@@ -64,6 +64,7 @@ pub mod remote_scheduler;
 pub mod restart_manager;
 pub mod scrobbler;
 pub mod shell_open;
+pub mod similar_artists;
 pub mod song_mix;
 pub mod stall_monitor;
 pub mod stats;
@@ -142,6 +143,8 @@ pub struct AppState {
     pub device_sync: Arc<devices::sync::DeviceSync>,
     /// Playback device name whose EQ state is currently loaded in `audio`.
     pub active_eq_device: Arc<parking_lot::Mutex<String>>,
+    /// Session cache for ListenBrainz similar-artist lookups (#2289).
+    pub similar_artists: Arc<similar_artists::SimilarArtistsCache>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -930,6 +933,7 @@ pub fn run() {
                 transcoder,
                 device_sync,
                 active_eq_device: Arc::new(parking_lot::Mutex::new(initial_eq_device)),
+                similar_artists: Arc::new(similar_artists::SimilarArtistsCache::new()),
             };
 
             crate::collection::library_folders_changed(app.handle().clone(), &state);

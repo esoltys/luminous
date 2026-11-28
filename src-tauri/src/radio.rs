@@ -7,13 +7,12 @@
 //! queue and starts playing immediately.
 
 use crate::models::{playable_library_song_where, PlayContext, ShuffleMode};
+use crate::similar_artists::{self, ArtistSeed};
 use crate::song_mix::{self, Candidate, MixOptions, Pool, Profile, Tuning};
 use crate::AppState;
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::time::Duration;
 
 /// Default target size of a generated radio queue.
 pub const DEFAULT_RADIO_LIMIT: usize = 40;
@@ -79,87 +78,6 @@ fn load_artist_seed_song(conn: &Connection, artist: &str) -> Result<Option<Candi
     Ok(song_mix::load_by_ids(conn, &[id])?.pop())
 }
 
-fn resolve_artist_mbid(
-    conn: &Connection,
-    artist: &str,
-    candidate_mbid: Option<&str>,
-) -> Option<String> {
-    if let Some(mbid) = candidate_mbid {
-        if !mbid.trim().is_empty() {
-            return Some(mbid.trim().to_lowercase());
-        }
-    }
-    let profile_mbid: Option<String> = conn
-        .query_row(
-            "SELECT musicbrainz_artist_id FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
-            params![artist],
-            |r| r.get(0),
-        )
-        .ok()
-        .flatten();
-    profile_mbid
-        .map(|s| s.trim().to_lowercase())
-        .filter(|s| !s.is_empty())
-}
-
-#[derive(Debug, Deserialize)]
-struct SimilarArtistResponseItem {
-    pub artist_mbid: Option<String>,
-    pub name: Option<String>,
-    pub score: Option<f64>,
-}
-
-/// Fetches similar artists from ListenBrainz Labs API with a 2.5s timeout.
-/// Fails silently to an empty map so callers proceed with local heuristics.
-async fn fetch_listenbrainz_similar_artists(artist_mbid: &str) -> HashMap<String, f64> {
-    let url = format!(
-        "https://labs.api.listenbrainz.org/similar-artists/json?artist_mbids={}&algorithm=session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30",
-        artist_mbid
-    );
-
-    let client = match reqwest::Client::builder()
-        .timeout(Duration::from_millis(2500))
-        .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return HashMap::new(),
-    };
-
-    let resp = match client.get(&url).send().await {
-        Ok(r) if r.status().is_success() => r,
-        _ => return HashMap::new(),
-    };
-
-    let items: Vec<SimilarArtistResponseItem> = match resp.json().await {
-        Ok(it) => it,
-        Err(_) => return HashMap::new(),
-    };
-
-    let mut map = HashMap::new();
-    let max_score = items.iter().filter_map(|i| i.score).fold(0.0f64, f64::max);
-    for item in items {
-        let norm = if max_score > 0.0 {
-            (item.score.unwrap_or(0.0).max(0.0) / max_score).clamp(0.0, 1.0)
-        } else {
-            0.5
-        };
-        if let Some(name) = item.name {
-            let n = name.trim().to_lowercase();
-            if !n.is_empty() {
-                map.insert(n, norm);
-            }
-        }
-        if let Some(mbid) = item.artist_mbid {
-            let m = mbid.trim().to_lowercase();
-            if !m.is_empty() {
-                map.insert(m, norm);
-            }
-        }
-    }
-    map
-}
-
 /// Resolves candidate songs from the local library matching `seed`.
 pub async fn generate_radio_songs(
     state: &AppState,
@@ -167,54 +85,42 @@ pub async fn generate_radio_songs(
     limit: usize,
 ) -> Result<RadioResult, String> {
     let db = state.db.clone();
-    let (seed_song, seed_title, artist_for_lookup, artist_mbid_opt, is_online) =
+    let (seed_song, seed_title, artist_for_lookup, candidate_mbid) =
         crate::db::run_blocking(&db, {
             let seed = seed.clone();
-            move |conn| {
-                let online = crate::commands::context::is_online_enabled(conn);
-                match seed {
-                    RadioSeed::Song { song_id } => {
-                        let cand = song_mix::load_by_ids(conn, &[song_id])?
-                            .pop()
-                            .ok_or_else(|| anyhow::anyhow!("Song not found: {}", song_id))?;
-                        let title = cand
-                            .title
-                            .clone()
-                            .unwrap_or_else(|| "Unknown Song".to_string());
-                        let artist_name = cand.artist_key.clone().unwrap_or_default();
-                        let mbid = resolve_artist_mbid(
-                            conn,
-                            &artist_name,
-                            cand.musicbrainz_artist_id.as_deref(),
-                        );
-                        Ok((Some(cand), title, artist_name, mbid, online))
-                    }
-                    RadioSeed::Artist { artist } => {
-                        let cand = load_artist_seed_song(conn, &artist)?;
-                        let title = artist.clone();
-                        let mbid = resolve_artist_mbid(
-                            conn,
-                            &artist,
-                            cand.as_ref()
-                                .and_then(|c| c.musicbrainz_artist_id.as_deref()),
-                        );
-                        Ok((cand, title, artist.to_lowercase(), mbid, online))
-                    }
+            move |conn| match seed {
+                RadioSeed::Song { song_id } => {
+                    let cand = song_mix::load_by_ids(conn, &[song_id])?
+                        .pop()
+                        .ok_or_else(|| anyhow::anyhow!("Song not found: {}", song_id))?;
+                    let title = cand
+                        .title
+                        .clone()
+                        .unwrap_or_else(|| "Unknown Song".to_string());
+                    let artist_name = cand.artist_key.clone().unwrap_or_default();
+                    let mbid = cand.musicbrainz_artist_id.clone();
+                    Ok((Some(cand), title, artist_name, mbid))
+                }
+                RadioSeed::Artist { artist } => {
+                    let cand = load_artist_seed_song(conn, &artist)?;
+                    let title = artist.clone();
+                    let mbid = cand.as_ref().and_then(|c| c.musicbrainz_artist_id.clone());
+                    Ok((cand, title, artist.to_lowercase(), mbid))
                 }
             }
         })
         .await
         .map_err(|e| e.to_string())?;
 
-    let similar_artists = if is_online {
-        if let Some(ref mbid) = artist_mbid_opt {
-            fetch_listenbrainz_similar_artists(mbid).await
-        } else {
-            HashMap::new()
-        }
-    } else {
-        HashMap::new()
-    };
+    let similar_artists = similar_artists::resolve_for_seeds(
+        &db,
+        &state.similar_artists,
+        vec![ArtistSeed {
+            artist_key: artist_for_lookup.clone(),
+            musicbrainz_artist_id: candidate_mbid,
+        }],
+    )
+    .await;
 
     let result_ids = crate::db::run_blocking(&db, move |conn| {
         let pool = Pool::load(conn)?;
