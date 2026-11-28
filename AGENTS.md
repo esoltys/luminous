@@ -164,7 +164,7 @@ verify with the user, not a reason to skip telling them.
 - **Branching Model**:
   - `main` is the rolling release line. All feature, fix, chore, and docs work branches from and targets `main` directly.
   - There is no long-lived integration branch, and none is planned. Never create or target any branch other than `main`.
-  - A milestone (named for its release version, e.g. `2026.11.2`) tracks release scope only, never a git branch.
+  - A milestone (named for its release version, e.g. `2026.12.0`) tracks release scope only, never a git branch.
   - Before creating a branch, confirm the base: `git fetch origin && git switch -c <branch> origin/main`.
 - **Direct Commits Prohibited**:
   - NEVER commit or push directly to `main`. All changes ship via Pull Request, even release version bumps and docs-only edits.
