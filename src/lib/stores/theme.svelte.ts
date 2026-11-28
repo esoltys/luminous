@@ -202,15 +202,6 @@ export function resolveDockGlowColors(
 }
 
 /**
- * Tint alpha for the float acrylic recipe (menus, popovers, toolbars, see
- * app.css): denser than chrome, since a menu's text sits directly over
- * whatever text is behind it.
- */
-function floatAlpha(isDark: boolean): number {
-  return isDark ? 0.7 : 0.75;
-}
-
-/**
  * The chrome acrylic recipe's `saturate()` factor. app.css spells it in
  * `--acrylic-chrome-filter`; themeStore.test.ts fails if the two disagree.
  */
@@ -1144,7 +1135,6 @@ export class ThemeStore {
     root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(bgPlayerbar, alpha));
     root.style.setProperty("--glass-solid-sidebar", flatGlassColor(bgSidebar, alpha, bgMain));
     root.style.setProperty("--acrylic-chrome-opacity", `${alpha * 100}%`);
-    root.style.setProperty("--acrylic-float-opacity", `${floatAlpha(isDark) * 100}%`);
     root.style.setProperty(
       "--glass-border-color",
       isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)",
@@ -1185,7 +1175,7 @@ export class ThemeStore {
   private async queryGpuCompositing() {
     try {
       this.gpuCompositing = (await invoke<boolean>("webview_gpu_compositing")) === true;
-      // Lets app.css drop backdrop-filter from the float acrylic recipe.
+      // Lets the player bar and miniplayer drop their backdrop-filter.
       document.documentElement.classList.toggle("no-gpu-compositing", !this.gpuCompositing);
     } catch (e) {
       console.error("Failed to query webview GPU compositing:", e);

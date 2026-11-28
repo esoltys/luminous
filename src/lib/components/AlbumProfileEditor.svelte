@@ -271,7 +271,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   use:portal
-  class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 acrylic-scrim"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 modal-scrim"
   role="dialog"
   aria-modal="true"
   aria-labelledby="album-editor-title"

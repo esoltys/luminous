@@ -22,8 +22,7 @@
   let { icon: Icon, label, width = CONTEXT_SUBMENU_WIDTH_PX, children }: Props = $props();
 
   // A flyout cannot live inside its parent menu: the menu scrolls (overflow
-  // clips absolute children) and is `.acrylic-float` (transform +
-  // backdrop-filter make it the containing block of fixed children). So the
+  // clips absolute children). So the
   // flyout is portaled to <body> and placed from the trigger's rect, clamped
   // to the viewport above the player dock; it scrolls itself when too tall.
   let isOpen = $state(false);
@@ -108,13 +107,12 @@
 </div>
 
 {#if isOpen}
-  <!-- Opaque, not acrylic: a backdrop-filter here could only sample the menu, not the page. -->
   <div
     use:portal
     {...{ [CONTEXT_MENU_LAYER_ATTR]: "" }}
     bind:offsetHeight={flyoutHeight}
     style="left: {left}px; top: {top}px; width: {width}px; max-height: {maxHeight}px;"
-    class="fixed z-50 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
+    class="fixed z-50 overflow-y-auto float-surface border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
     role="menu"
     tabindex="-1"
     onmouseenter={open}

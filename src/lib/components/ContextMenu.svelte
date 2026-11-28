@@ -85,7 +85,7 @@
     : ` max-height: ${maxHeight}px;`}"
   class="fixed {zClass} {widthPx === undefined
     ? 'w-52'
-    : ''} overflow-y-auto acrylic-float border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
+    : ''} overflow-y-auto float-surface border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
   role="menu"
   tabindex="-1"
 >

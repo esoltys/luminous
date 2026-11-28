@@ -338,31 +338,32 @@
 }
 
 /*
- * Acrylic: the app's one translucent material, in two recipes picked by the
- * surface's role rather than per component (#1894). Saturation is what makes
- * it read as acrylic: blur alone greys out what shows through, saturate brings
- * its colour back.
+ * Acrylic: the app's one translucent material (#1894), kept for chrome — large
+ * panels that content moves behind (player bar, song table surfaces, lyrics
+ * header). A small blur, so what passes underneath still reads as shapes;
+ * saturation is what makes it read as acrylic (blur alone greys out what shows
+ * through, saturate brings its colour back). Detail headers over
+ * already-blurred cover art use `.acrylic-chrome-tint` (same tint, no
+ * backdrop-filter).
  *
- * - Chrome: large panels that content moves behind (player bar, song table
- *   surfaces, lyrics header). A small blur, so what passes underneath still
- *   reads as shapes. Detail headers over already-blurred cover art use
- *   `.acrylic-chrome-tint` (same tint, no backdrop-filter).
- * - Float: surfaces that open over content (menus, popovers, selection
- *   toolbars, the unpinned info sidebar). A large blur, so text behind them
- *   turns into soft colour instead of competing with their own text.
+ * Everything that opens over content is NOT acrylic: menus, popovers and
+ * toolbars are `.float-surface` (opaque) and modals dim with `.modal-scrim`.
+ * WebView2 re-runs a backdrop-filter on every frame in which anything under
+ * or over the blurred area changes, so a blur over the playing player bar's
+ * visualizer, or over a spinner, re-blurs that whole area at the display's
+ * refresh rate: a full-window modal blur measured ~23% GPU during playback
+ * against ~6% without it (#2427). Don't add backdrop-filter to either recipe;
+ * backdropFilterProdBuild.test.ts fails if one appears.
  *
  * Tints and opacities come from ThemeStore.applyGlassVars(). A surface whose
  * tint isn't the sidebar colour sets --acrylic-tint itself.
  *
- * Both pin themselves to their own GPU layer: a hover repaint inside the
- * blurred region (song rows, menu items, a header toast portaled above)
- * otherwise re-rasterizes the backdrop-filter against a stale frame, leaving
- * a smeared or dark patch until something else forces a full repaint. That
- * pinning (like backdrop-filter itself) makes the surface a Backdrop Root, so
- * a translucent surface nested inside one can't sample what's behind it —
- * nested popups stay opaque (see SongContextMenu's submenu).
+ * Chrome pins itself to its own GPU layer: a hover repaint inside the blurred
+ * region (song rows, a header toast portaled above) otherwise re-rasterizes
+ * the backdrop-filter against a stale frame, leaving a smeared or dark patch
+ * until something else forces a full repaint.
  */
-/* Not inherited, so a tint set on one surface never leaks into acrylic
+/* Not inherited, so a tint set on one surface never leaks into a surface
    nested inside it; an unset tint falls back to each recipe's default. */
 @property --acrylic-tint {
   syntax: "*";
@@ -374,13 +375,11 @@
      theme.svelte.ts) for the flattened sidebar, top nav and right panel;
      themeStore.test.ts fails if the two disagree. */
   --acrylic-chrome-filter: blur(20px) saturate(180%);
-  --acrylic-float-filter: blur(60px) saturate(200%);
-  --acrylic-scrim-filter: blur(8px);
 }
 
 /* Detail headers use .acrylic-chrome-tint instead of .acrylic-chrome: they sit
    over already-blurred cover art (BlurredCover) and host portaled
-   acrylic-float menus that overlap their bottom edge, so dropping
+   menus that overlap their bottom edge, so dropping
    backdrop-filter avoids overlapping backdrop-filter layers flickering in
    WebView2 during reactive logo / spectrum frames (#2089). */
 .acrylic-chrome,
@@ -399,35 +398,16 @@
   transform: translateZ(0);
 }
 
-.acrylic-float {
-  background-color: color-mix(
-    in srgb,
-    var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-float-opacity, 70%),
-    transparent
-  );
-  -webkit-backdrop-filter: var(--acrylic-float-filter);
-  backdrop-filter: var(--acrylic-float-filter);
-  will-change: backdrop-filter;
-  transform: translateZ(0);
-}
-
-/* Without GPU compositing (WebKitGTK with GPU rendering disabled, see
-   ThemeStore.gpuCompositing) backdrop-filter doesn't render, and a
-   translucent menu over sharp text is unreadable, so floats go opaque.
-   Chrome surfaces sit over the already-blurred cover art, so they keep
-   their tint. */
-:root.no-gpu-compositing .acrylic-float {
+/* Menus, popovers, selection toolbars, the unpinned info panel: opaque, in
+   the sidebar colour unless the surface sets --acrylic-tint. */
+.float-surface {
   background-color: var(--acrylic-tint, var(--color-brand-sidebar));
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 /* The dimmed layer behind a modal. Black unless the overlay sets
    --acrylic-tint (the welcome screen and drop target dim toward the canvas). */
-.acrylic-scrim {
+.modal-scrim {
   background-color: color-mix(in srgb, var(--acrylic-tint, black) 70%, transparent);
-  -webkit-backdrop-filter: var(--acrylic-scrim-filter);
-  backdrop-filter: var(--acrylic-scrim-filter);
 }
 
 /*
