@@ -4,6 +4,7 @@ import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import AlbumTagEditor from "./AlbumTagEditor.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { collectionStore } from "../stores/collection.svelte";
+import { ALBUM_TAG_SAVE_TASK_ID, tasksStore } from "../stores/tasks.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -42,6 +43,7 @@ describe("AlbumTagEditor.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     collectionStore.songs = [];
+    tasksStore.tasks = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "save_album_tags") return 2;
       if (cmd === "clear_album_cover_art") return 2;
@@ -141,6 +143,75 @@ describe("AlbumTagEditor.svelte", () => {
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  // A batch save over a network share takes minutes; the editor must not stay
+  // open (and animating) for it — the task toast carries the progress (#2427).
+  it("closes as soon as Save is pressed and finishes the save in the background", async () => {
+    let finishSave!: (count: number) => void;
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "save_album_tags")
+        return new Promise<number>((resolve) => (finishSave = resolve));
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      initialTracks: [track(), track()],
+      onClose,
+      onSave,
+    });
+
+    await fireEvent.input(getByLabelText("Album Title"), { target: { value: "Renamed" } });
+    await fireEvent.click(getByRole("button", { name: /save tags/i }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(tasksStore.isTaskActive(ALBUM_TAG_SAVE_TASK_ID)).toBe(true);
+    expect(savedEdit()).toMatchObject({ album: set("Renamed") });
+
+    finishSave(2);
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(tasksStore.isTaskActive(ALBUM_TAG_SAVE_TASK_ID)).toBe(false);
+  });
+
+  it("reports a failed background save in the task and leaves onSave uncalled", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "save_album_tags") throw new Error("disk full");
+      return null;
+    });
+    const onSave = vi.fn();
+    const { getByRole } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialTracks: [track()],
+      onClose: vi.fn(),
+      onSave,
+    });
+
+    await fireEvent.click(getByRole("button", { name: /save tags/i }));
+
+    await waitFor(() =>
+      expect(tasksStore.tasks.find((t) => t.id === ALBUM_TAG_SAVE_TASK_ID)?.status).toBe("failed"),
+    );
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("won't start a second batch save while one is running", async () => {
+    tasksStore.startTask({ id: ALBUM_TAG_SAVE_TASK_ID, label: "Saving tags…", total: 20 });
+    const onClose = vi.fn();
+    const { getByRole } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      initialTracks: [track(), track()],
+      onClose,
+    });
+
+    const save = getByRole("button", { name: /save tags/i });
+    expect(save).toBeDisabled();
+    await fireEvent.keyDown(save.closest("[role=dialog]")!, { key: "Enter" });
+    expect(invoke).not.toHaveBeenCalledWith("save_album_tags", expect.anything());
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   // A selection spanning albums must not overwrite every track's album,

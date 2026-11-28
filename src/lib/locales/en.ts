@@ -1869,7 +1869,6 @@ export const en = {
     },
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
-    saving: "Saving album tags...",
     saveSuccess: {
       one: "Updated album tags for {count} song",
       other: "Updated album tags for {count} songs",

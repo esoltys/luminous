@@ -2031,7 +2031,6 @@ export const fr: DeepStringRecord<typeof en> = {
     },
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
-    saving: "Enregistrement des étiquettes de l'album...",
     saveSuccess: {
       one: "Étiquettes d'album mises à jour pour {count} chanson",
       other: "Étiquettes d'album mises à jour pour {count} chansons",

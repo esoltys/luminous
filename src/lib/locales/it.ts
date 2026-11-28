@@ -1914,7 +1914,6 @@ export const it = {
     },
     cancelBtn: "Annulla",
     saveBtn: "Salva tag",
-    saving: "Salvataggio dei tag dell'album in corso...",
     saveSuccess: {
       one: "Tag dell'album aggiornati per {count} brano",
       other: "Tag dell'album aggiornati per {count} brani",

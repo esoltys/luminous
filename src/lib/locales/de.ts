@@ -1920,7 +1920,6 @@ export const de = {
     },
     cancelBtn: "Abbrechen",
     saveBtn: "Tags speichern",
-    saving: "Album-Tags werden gespeichert ...",
     saveSuccess: {
       one: "Album-Tags für {count} Titel aktualisiert",
       other: "Album-Tags für {count} Titel aktualisiert",

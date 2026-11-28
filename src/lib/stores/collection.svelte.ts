@@ -45,7 +45,7 @@ import { navigationStore } from "./navigation.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
-import { tasksStore } from "./tasks.svelte";
+import { ALBUM_TAG_SAVE_TASK_ID, tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
 import {
   MAX_RECENT_SEARCHES,
@@ -703,7 +703,7 @@ class CollectionStore {
       // Track batch tag edits (#1087)
       await this.events.listen<TagBatchProgressPayload>("tag-batch-progress", (event) => {
         const { current, total, title, done } = event.payload;
-        const taskId = "album-tag-save";
+        const taskId = ALBUM_TAG_SAVE_TASK_ID;
         if (done) {
           tasksStore.completeTask(
             taskId,

@@ -1914,7 +1914,6 @@ export const es = {
     },
     cancelBtn: "Cancelar",
     saveBtn: "Guardar etiquetas",
-    saving: "Guardando etiquetas del álbum...",
     saveSuccess: {
       one: "Se actualizaron las etiquetas del álbum en {count} canción",
       other: "Se actualizaron las etiquetas del álbum en {count} canciones",

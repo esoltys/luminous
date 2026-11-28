@@ -16,7 +16,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { tasksStore } from "../stores/tasks.svelte";
+  import { ALBUM_TAG_SAVE_TASK_ID, tasksStore } from "../stores/tasks.svelte";
   import FormField from "./FormField.svelte";
   import Modal from "./Modal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -139,7 +139,6 @@
     return showsMixed ? i18n.t("albumTagEditor.mixedValues") : fallback;
   }
 
-  let isSaving = $state(false);
   let isClearingArt = $state(false);
   let showClearArtConfirm = $state(false);
 
@@ -163,48 +162,79 @@
     }
   }
 
-  async function handleSave() {
-    isSaving = true;
+  // One batch save at a time: a second would rewrite the same files while the
+  // first is still writing them.
+  const saveInProgress = $derived(tasksStore.isTaskActive(ALBUM_TAG_SAVE_TASK_ID));
+
+  /**
+   * Closes the editor at once and saves in the background. A batch save over a
+   * network share can take minutes, and the task toast already shows its
+   * progress and any failure; keeping the modal open meant a spinner animating
+   * over the whole window for that long (#2427).
+   */
+  function handleSave() {
+    if (saveInProgress) return;
     const albumName = fields.album.value || i18n.t("collection.unknownAlbum");
-    const taskId = "album-tag-save";
+    void saveInBackground({
+      albumName,
+      songIds: [...songIds],
+      filePaths: [...filePaths],
+      edit: $state.snapshot(fields.edit),
+      total: tracksCount,
+      source,
+      folderPath,
+      onSave,
+    });
+    onClose();
+  }
+
+  // Runs after the editor has closed, so it takes everything it needs as
+  // arguments rather than reading the component's props or fields.
+  async function saveInBackground(save: {
+    albumName: string;
+    songIds: number[];
+    filePaths: string[];
+    edit: typeof fields.edit;
+    total: number;
+    source?: FileSource;
+    folderPath?: string[];
+    onSave?: () => void;
+  }) {
+    const { albumName } = save;
     tasksStore.startTask({
-      id: taskId,
+      id: ALBUM_TAG_SAVE_TASK_ID,
       label: i18n.t(
         "tasks.savingAlbumTags",
         { album: albumName },
         `Saving tags for ${albumName}...`,
       ),
-      total: tracksCount,
+      total: save.total,
       contextName: albumName,
     });
     try {
-      if (songIds.length > 0) {
-        await invoke("save_album_tags", { songIds, edit: fields.edit });
+      if (save.songIds.length > 0) {
+        await invoke("save_album_tags", { songIds: save.songIds, edit: save.edit });
       }
-      if (filePaths.length > 0) {
-        await invoke("save_batch_file_tags", { paths: filePaths, edit: fields.edit });
-        if (source && folderPath) {
-          await scanFolder(source, folderPath);
+      if (save.filePaths.length > 0) {
+        await invoke("save_batch_file_tags", { paths: save.filePaths, edit: save.edit });
+        if (save.source && save.folderPath) {
+          await scanFolder(save.source, save.folderPath);
         }
         filesStore.reloadFolder();
       }
 
       tasksStore.completeTask(
-        taskId,
+        ALBUM_TAG_SAVE_TASK_ID,
         i18n.t("tasks.albumTagsSaved", { album: albumName }, `Saved tags for ${albumName}`),
       );
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
-
-      if (onSave) onSave();
-      onClose();
+      save.onSave?.();
     } catch (e: any) {
       console.error("Failed to save album tags:", e);
       const errMsg = e.toString();
-      tasksStore.failTask(taskId, errMsg);
+      tasksStore.failTask(ALBUM_TAG_SAVE_TASK_ID, errMsg);
       toastStore.show(i18n.t("albumTagEditor.saveFailedPrefix") + errMsg, "error");
-    } finally {
-      isSaving = false;
     }
   }
 
@@ -212,7 +242,6 @@
     if (e.key === "Enter") {
       const target = e.target as HTMLElement;
       if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
-      if (isSaving) return;
       e.preventDefault();
       handleSave();
     }
@@ -229,7 +258,6 @@
     </div>
     <button
       onclick={onClose}
-      disabled={isSaving}
       class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50"
     >
       <X class="w-4 h-4" />
@@ -270,7 +298,7 @@
             onclick={() => {
               showClearArtConfirm = true;
             }}
-            disabled={!hasEmbeddedArtState || isSaving || isClearingArt}
+            disabled={!hasEmbeddedArtState || saveInProgress || isClearingArt}
             variant="secondary"
             size="sm"
           >
@@ -291,7 +319,6 @@
             id="album-tag-album"
             bind:value={() => fields.album.value ?? "", (v) => fields.album.set(v)}
             placeholder={mixedOr(fields.album.showsMixed)}
-            disabled={isSaving}
             size="sm"
             class="w-full"
           />
@@ -315,7 +342,6 @@
             <ChipInput
               id="album-tag-albumartist"
               bind:value={() => fields.albumArtist.value ?? "", (v) => fields.albumArtist.set(v)}
-              disabled={isSaving}
               placeholder={mixedOr(
                 fields.albumArtist.showsMixed,
                 i18n.t("albumTagEditor.albumArtistPlaceholder"),
@@ -334,7 +360,6 @@
             checked={fields.compilation.value === true}
             indeterminate={fields.compilation.showsMixed}
             onchange={handleCompilationToggle}
-            disabled={isSaving}
             class="rounded accent-brand-accent"
           />
           {i18n.t("albumTagEditor.compilationField")}
@@ -353,7 +378,6 @@
           <ChipInput
             id="album-tag-genre"
             bind:value={() => fields.genre.value ?? "", (v) => fields.genre.set(v)}
-            disabled={isSaving}
             placeholder={mixedOr(
               fields.genre.showsMixed,
               i18n.t("albumTagEditor.genrePlaceholder"),
@@ -368,7 +392,6 @@
             id="album-tag-year"
             type="number"
             value={fields.year.value ?? ""}
-            disabled={isSaving}
             placeholder={mixedOr(fields.year.showsMixed)}
             oninput={(e) => {
               const val = parseInt(e.currentTarget.value, 10);
@@ -387,7 +410,6 @@
           <Input
             id="album-tag-language"
             value={fields.language.value ?? ""}
-            disabled={isSaving}
             placeholder={mixedOr(
               fields.language.showsMixed,
               i18n.t("albumTagEditor.languagePlaceholder"),
@@ -398,7 +420,7 @@
           />
         </FormField>
 
-        <DiscFields disc={fields.disc} subtitle={fields.discSubtitle} disabled={isSaving} />
+        <DiscFields disc={fields.disc} subtitle={fields.discSubtitle} />
 
         <!-- Sort Overrides ("Sort As") -->
         <details
@@ -420,7 +442,6 @@
                 id="album-tag-albumsort"
                 bind:value={() => fields.albumsort.value ?? "", (v) => fields.albumsort.set(v)}
                 placeholder={mixedOr(fields.albumsort.showsMixed)}
-                disabled={isSaving}
                 size="sm"
                 class="w-full"
               />
@@ -433,7 +454,6 @@
                   () => fields.albumArtistSort.value ?? "", (v) => fields.albumArtistSort.set(v)
                 }
                 placeholder={mixedOr(fields.albumArtistSort.showsMixed)}
-                disabled={isSaving}
                 size="sm"
                 class="w-full"
               />
@@ -444,7 +464,6 @@
                 id="album-tag-genresort"
                 bind:value={() => fields.genresort.value ?? "", (v) => fields.genresort.set(v)}
                 placeholder={mixedOr(fields.genresort.showsMixed)}
-                disabled={isSaving}
                 size="sm"
                 class="w-full"
               />
@@ -464,17 +483,12 @@
     </div>
 
     <div class="flex items-center gap-3">
-      <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
+      <Button onclick={onClose} variant="secondary" size="sm">
         {i18n.t("albumTagEditor.cancelBtn")}
       </Button>
-      <Button onclick={handleSave} disabled={isSaving} variant="primary" size="sm">
-        {#if isSaving}
-          <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-          <span>{i18n.t("albumTagEditor.saving")}</span>
-        {:else}
-          <Save class="w-3.5 h-3.5" />
-          <span>{i18n.t("albumTagEditor.saveBtn")}</span>
-        {/if}
+      <Button onclick={handleSave} disabled={saveInProgress} variant="primary" size="sm">
+        <Save class="w-3.5 h-3.5" />
+        <span>{i18n.t("albumTagEditor.saveBtn")}</span>
       </Button>
     </div>
   </div>
