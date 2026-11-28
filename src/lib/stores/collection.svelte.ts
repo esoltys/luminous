@@ -45,7 +45,7 @@ import { navigationStore } from "./navigation.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
-import { ALBUM_TAG_SAVE_TASK_ID, tasksStore } from "./tasks.svelte";
+import { tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
 import {
   MAX_RECENT_SEARCHES,
@@ -181,6 +181,14 @@ export function getScanPhaseLabel(phase: ScanPhase): string {
       return i18n.t("tasks.scanPhaseUpdating", {}, "updating library");
   }
 }
+
+/**
+ * Task id of a batch tag save (the album/multi-song tag editor and the album
+ * profile editor start it; this store's `tag-batch-progress` listener reports
+ * its progress). The backend doesn't serialize batch writes, so both editors
+ * refuse to start one while this task is active.
+ */
+export const ALBUM_TAG_SAVE_TASK_ID = "album-tag-save";
 
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
@@ -703,21 +711,20 @@ class CollectionStore {
       // Track batch tag edits (#1087)
       await this.events.listen<TagBatchProgressPayload>("tag-batch-progress", (event) => {
         const { current, total, title, done } = event.payload;
-        const taskId = ALBUM_TAG_SAVE_TASK_ID;
         if (done) {
           tasksStore.completeTask(
-            taskId,
+            ALBUM_TAG_SAVE_TASK_ID,
             i18n.t("tasks.albumTagsSaved", { album: title }, `Saved tags for ${title}`),
           );
         } else {
-          if (!tasksStore.isTaskActive(taskId)) {
+          if (!tasksStore.isTaskActive(ALBUM_TAG_SAVE_TASK_ID)) {
             tasksStore.startTask({
-              id: taskId,
+              id: ALBUM_TAG_SAVE_TASK_ID,
               label: i18n.t("tasks.savingTags", {}, "Saving tags…"),
               total,
             });
           }
-          tasksStore.updateTask(taskId, {
+          tasksStore.updateTask(ALBUM_TAG_SAVE_TASK_ID, {
             current,
             total,
           });

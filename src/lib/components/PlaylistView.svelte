@@ -783,7 +783,7 @@
     <div class="flex-1 flex flex-col min-h-0 relative z-10 overflow-hidden">
       <div
         data-testid="playlist-header"
-        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
+        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--surface-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
           ? 'py-3'
           : 'pt-6 pb-6'} shrink-0"
       >

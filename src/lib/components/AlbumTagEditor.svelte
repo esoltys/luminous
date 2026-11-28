@@ -12,11 +12,11 @@
     CloudIcon,
   } from "phosphor-svelte";
   import X from "./XIcon.svelte";
-  import { collectionStore } from "../stores/collection.svelte";
+  import { ALBUM_TAG_SAVE_TASK_ID, collectionStore } from "../stores/collection.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { ALBUM_TAG_SAVE_TASK_ID, tasksStore } from "../stores/tasks.svelte";
+  import { tasksStore } from "../stores/tasks.svelte";
   import FormField from "./FormField.svelte";
   import Modal from "./Modal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -162,8 +162,7 @@
     }
   }
 
-  // One batch save at a time: a second would rewrite the same files while the
-  // first is still writing them.
+  // See ALBUM_TAG_SAVE_TASK_ID: one batch save at a time.
   const saveInProgress = $derived(tasksStore.isTaskActive(ALBUM_TAG_SAVE_TASK_ID));
 
   /**
@@ -172,35 +171,17 @@
    * progress and any failure; keeping the modal open meant a spinner animating
    * over the whole window for that long (#2427).
    */
-  function handleSave() {
+  async function handleSave() {
     if (saveInProgress) return;
+    // Captured before closing: the editor unmounts, so its props and fields
+    // can't be read after the first await.
     const albumName = fields.album.value || i18n.t("collection.unknownAlbum");
-    void saveInBackground({
-      albumName,
-      songIds: [...songIds],
-      filePaths: [...filePaths],
-      edit: $state.snapshot(fields.edit),
-      total: tracksCount,
-      source,
-      folderPath,
-      onSave,
-    });
-    onClose();
-  }
+    const ids = [...songIds];
+    const paths = [...filePaths];
+    const edit = $state.snapshot(fields.edit);
+    const folder = source && folderPath ? { source, path: folderPath } : null;
+    const done = onSave;
 
-  // Runs after the editor has closed, so it takes everything it needs as
-  // arguments rather than reading the component's props or fields.
-  async function saveInBackground(save: {
-    albumName: string;
-    songIds: number[];
-    filePaths: string[];
-    edit: typeof fields.edit;
-    total: number;
-    source?: FileSource;
-    folderPath?: string[];
-    onSave?: () => void;
-  }) {
-    const { albumName } = save;
     tasksStore.startTask({
       id: ALBUM_TAG_SAVE_TASK_ID,
       label: i18n.t(
@@ -208,18 +189,18 @@
         { album: albumName },
         `Saving tags for ${albumName}...`,
       ),
-      total: save.total,
+      total: tracksCount,
       contextName: albumName,
     });
+    onClose();
+
     try {
-      if (save.songIds.length > 0) {
-        await invoke("save_album_tags", { songIds: save.songIds, edit: save.edit });
+      if (ids.length > 0) {
+        await invoke("save_album_tags", { songIds: ids, edit });
       }
-      if (save.filePaths.length > 0) {
-        await invoke("save_batch_file_tags", { paths: save.filePaths, edit: save.edit });
-        if (save.source && save.folderPath) {
-          await scanFolder(save.source, save.folderPath);
-        }
+      if (paths.length > 0) {
+        await invoke("save_batch_file_tags", { paths, edit });
+        if (folder) await scanFolder(folder.source, folder.path);
         filesStore.reloadFolder();
       }
 
@@ -229,7 +210,7 @@
       );
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
-      save.onSave?.();
+      done?.();
     } catch (e: any) {
       console.error("Failed to save album tags:", e);
       const errMsg = e.toString();

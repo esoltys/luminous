@@ -230,7 +230,3 @@ class TasksStore {
 }
 
 export const tasksStore = new TasksStore();
-
-/** The batch tag save shared by the album/multi-song editor, the album profile
-    editor and the backend's `tag-batch-progress` events; one runs at a time. */
-export const ALBUM_TAG_SAVE_TASK_ID = "album-tag-save";

@@ -27,9 +27,9 @@
   import PlainChipInput from "./PlainChipInput.svelte";
   import CoverArt from "./CoverArt.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
-  import { collectionStore } from "../stores/collection.svelte";
+  import { ALBUM_TAG_SAVE_TASK_ID, collectionStore } from "../stores/collection.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { ALBUM_TAG_SAVE_TASK_ID, tasksStore } from "../stores/tasks.svelte";
+  import { tasksStore } from "../stores/tasks.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
   import SocialIcon from "./SocialIcon.svelte";
@@ -96,6 +96,10 @@
   });
 
   let isSaving = $state(false);
+  // Writing tags while another batch save is still writing them races it.
+  const tagSaveBlocked = $derived(
+    songIds.length > 0 && tasksStore.isTaskActive(ALBUM_TAG_SAVE_TASK_ID),
+  );
   let isMarkdownEditorOpen = $state(false);
 
   // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
@@ -184,7 +188,7 @@
   }
 
   async function handleSave() {
-    if (!albumName.trim()) return;
+    if (!albumName.trim() || tagSaveBlocked) return;
     isSaving = true;
     try {
       const cleanLinks = links
@@ -202,11 +206,10 @@
         description: description.trim() || null,
       };
 
-      const taskId = ALBUM_TAG_SAVE_TASK_ID;
       const targetAlbumName = fields.album.value || albumName || i18n.t("collection.unknownAlbum");
       if (songIds.length > 0) {
         tasksStore.startTask({
-          id: taskId,
+          id: ALBUM_TAG_SAVE_TASK_ID,
           label: i18n.t(
             "tasks.savingAlbumTags",
             { album: targetAlbumName },
@@ -226,7 +229,7 @@
 
       if (songIds.length > 0) {
         tasksStore.completeTask(
-          taskId,
+          ALBUM_TAG_SAVE_TASK_ID,
           i18n.t(
             "tasks.albumTagsSaved",
             { album: targetAlbumName },
@@ -704,7 +707,12 @@
         <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
           {i18n.t("albumProfileEditor.cancel", {}, "Cancel")}
         </Button>
-        <Button onclick={handleSave} disabled={isSaving} variant="primary" size="sm">
+        <Button
+          onclick={handleSave}
+          disabled={isSaving || tagSaveBlocked}
+          variant="primary"
+          size="sm"
+        >
           {#if isSaving}
             <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
             <span>{i18n.t("albumProfileEditor.saving", {}, "Saving...")}</span>

@@ -21,10 +21,10 @@
 
   let { icon: Icon, label, width = CONTEXT_SUBMENU_WIDTH_PX, children }: Props = $props();
 
-  // A flyout cannot live inside its parent menu: the menu scrolls (overflow
-  // clips absolute children). So the
-  // flyout is portaled to <body> and placed from the trigger's rect, clamped
-  // to the viewport above the player dock; it scrolls itself when too tall.
+  // A flyout cannot live inside its parent menu, which scrolls (overflow clips
+  // absolute children), so it is portaled to <body> and placed from the
+  // trigger's rect, clamped to the viewport above the player dock; it scrolls
+  // itself when too tall.
   let isOpen = $state(false);
   let closeTimer: ReturnType<typeof setTimeout> | null = null;
   let triggerEl = $state<HTMLDivElement | null>(null);

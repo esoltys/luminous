@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import AlbumTagEditor from "./AlbumTagEditor.svelte";
 import { invoke } from "@tauri-apps/api/core";
-import { collectionStore } from "../stores/collection.svelte";
-import { ALBUM_TAG_SAVE_TASK_ID, tasksStore } from "../stores/tasks.svelte";
+import { ALBUM_TAG_SAVE_TASK_ID, collectionStore } from "../stores/collection.svelte";
+import { tasksStore } from "../stores/tasks.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({

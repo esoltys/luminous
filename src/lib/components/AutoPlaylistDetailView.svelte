@@ -769,7 +769,7 @@
 >
   <div
     data-testid="autoplaylist-header"
-    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
+    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--surface-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isPinnedHeaderCollapsed
       ? 'py-3'
       : 'pt-6 pb-6'} shrink-0"
   >

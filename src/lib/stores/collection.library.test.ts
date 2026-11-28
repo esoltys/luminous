@@ -13,6 +13,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 import {
+  ALBUM_TAG_SAVE_TASK_ID,
   collectionStore,
   getDirectoryDisplayName,
   resolveScanLibraryName,
@@ -732,7 +733,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     tasksStore.tasks = [];
 
     // 1. Pre-started task (e.g. by AlbumTagEditor with album name)
-    const taskId = "album-tag-save";
+    const taskId = ALBUM_TAG_SAVE_TASK_ID;
     tasksStore.startTask({
       id: taskId,
       label: "Saving tags for Nevermind…",

@@ -356,7 +356,7 @@
  * backdropFilterProdBuild.test.ts fails if one appears.
  *
  * Tints and opacities come from ThemeStore.applyGlassVars(). A surface whose
- * tint isn't the sidebar colour sets --acrylic-tint itself.
+ * tint isn't the sidebar colour sets --surface-tint itself.
  *
  * Chrome pins itself to its own GPU layer: a hover repaint inside the blurred
  * region (song rows, a header toast portaled above) otherwise re-rasterizes
@@ -365,7 +365,7 @@
  */
 /* Not inherited, so a tint set on one surface never leaks into a surface
    nested inside it; an unset tint falls back to each recipe's default. */
-@property --acrylic-tint {
+@property --surface-tint {
   syntax: "*";
   inherits: false;
 }
@@ -386,7 +386,7 @@
 .acrylic-chrome-tint {
   background-color: color-mix(
     in srgb,
-    var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-chrome-opacity, 50%),
+    var(--surface-tint, var(--color-brand-sidebar)) var(--acrylic-chrome-opacity, 50%),
     transparent
   );
 }
@@ -399,15 +399,15 @@
 }
 
 /* Menus, popovers, selection toolbars, the unpinned info panel: opaque, in
-   the sidebar colour unless the surface sets --acrylic-tint. */
+   the sidebar colour unless the surface sets --surface-tint. */
 .float-surface {
-  background-color: var(--acrylic-tint, var(--color-brand-sidebar));
+  background-color: var(--surface-tint, var(--color-brand-sidebar));
 }
 
 /* The dimmed layer behind a modal. Black unless the overlay sets
-   --acrylic-tint (the welcome screen and drop target dim toward the canvas). */
+   --surface-tint (the welcome screen and drop target dim toward the canvas). */
 .modal-scrim {
-  background-color: color-mix(in srgb, var(--acrylic-tint, black) 70%, transparent);
+  background-color: color-mix(in srgb, var(--surface-tint, black) 70%, transparent);
 }
 
 /*
