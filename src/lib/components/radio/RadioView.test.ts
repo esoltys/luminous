@@ -38,6 +38,7 @@ import { radioStore } from "../../stores/radio.svelte";
 import { playerStore } from "../../stores/player.svelte";
 import { playlistsStore } from "../../stores/playlists.svelte";
 import { navigationStore } from "../../stores/navigation.svelte";
+import { tasksStore } from "../../stores/tasks.svelte";
 
 function makeStation(overrides: Partial<RadioDirectoryStation> = {}): RadioDirectoryStation {
   return {
@@ -79,6 +80,7 @@ describe("RadioView", () => {
       delete listeners[key];
     }
     radioStore.dispose();
+    tasksStore.clearTask("radio-directory-sync");
     radioStore.subView = "discover";
     radioStore.searchQuery = "";
     radioStore.selectedCountry = null;
@@ -693,6 +695,111 @@ describe("RadioView", () => {
     expect(radioStore.savedStations.map((s) => s.stationuuid)).toEqual(["uuid-2", "uuid-1"]);
     expect(mockInvoke).toHaveBeenCalledWith("reorder_saved_stations", {
       order: ["uuid-2", "uuid-1"],
+    });
+  });
+
+  it("reports task progress and completion when refreshing index from overflow menu (#2437)", async () => {
+    const status: RadioDirectoryStatus = {
+      optedIn: true,
+      stationCount: 100,
+      playableStationCount: 95,
+      lastSyncedAt: 1700000000,
+      lastFullSyncAt: 1700000000,
+      nextAutoSyncAt: null,
+      syncInProgress: false,
+      lastError: null,
+      attributionUrl: "https://www.radio-browser.info",
+    };
+
+    let resolveSync!: (value: any) => void;
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") return status;
+      if (cmd === "get_saved_radio_stations") return [];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "get_radio_directory_facets") return defaultFacets;
+      if (cmd === "query_radio_directory") return [makeStation()];
+      if (cmd === "sync_radio_directory") {
+        return new Promise((resolve) => {
+          resolveSync = resolve;
+        });
+      }
+      return null;
+    });
+
+    render(RadioView);
+
+    const overflowBtn = await screen.findByTestId("radio-overflow-btn");
+    await fireEvent.click(overflowBtn);
+
+    const refreshItem = await screen.findByText("Refresh index");
+    await fireEvent.click(refreshItem);
+
+    const startedTask = tasksStore.tasks.find((t) => t.id === "radio-directory-sync");
+    expect(startedTask?.status).toBe("running");
+    expect(startedTask?.label).toBe("Refreshing station index…");
+
+    listeners["radio-directory-sync-progress"]?.({
+      payload: { mode: "incremental", fetchedStations: 300, page: 2, done: false },
+    });
+
+    await waitFor(() => {
+      const updated = tasksStore.tasks.find((t) => t.id === "radio-directory-sync");
+      expect(updated?.label).toContain("300");
+      expect(updated?.label).toContain("2");
+    });
+
+    resolveSync({
+      mode: "incremental",
+      upserted: 12,
+      removed: 0,
+      totalStations: 112,
+      syncedAt: 1700000100,
+    });
+
+    await waitFor(() => {
+      const done = tasksStore.tasks.find((t) => t.id === "radio-directory-sync");
+      expect(done?.status).toBe("done");
+      expect(done?.label).toContain("112");
+    });
+  });
+
+  it("marks the radio-directory-sync task failed when refresh errors (#2437)", async () => {
+    const status: RadioDirectoryStatus = {
+      optedIn: true,
+      stationCount: 100,
+      playableStationCount: 95,
+      lastSyncedAt: 1700000000,
+      lastFullSyncAt: 1700000000,
+      nextAutoSyncAt: null,
+      syncInProgress: false,
+      lastError: null,
+      attributionUrl: "https://www.radio-browser.info",
+    };
+
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") return status;
+      if (cmd === "get_saved_radio_stations") return [];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "get_radio_directory_facets") return defaultFacets;
+      if (cmd === "query_radio_directory") return [makeStation()];
+      if (cmd === "sync_radio_directory") {
+        throw new Error("Network timeout");
+      }
+      return null;
+    });
+
+    render(RadioView);
+
+    const overflowBtn = await screen.findByTestId("radio-overflow-btn");
+    await fireEvent.click(overflowBtn);
+    await fireEvent.click(await screen.findByText("Refresh index"));
+
+    await waitFor(() => {
+      const failed = tasksStore.tasks.find((t) => t.id === "radio-directory-sync");
+      expect(failed?.status).toBe("failed");
+      expect(failed?.error).toContain("Network timeout");
     });
   });
 });
