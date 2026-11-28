@@ -271,15 +271,158 @@ fn prune_stale_logs(app_data_dir: &Path, now: jiff::Timestamp) {
     }
 }
 
+/// PII-free library and runtime environment summary included in the diagnostics
+/// export header. Never retains file paths, folder nicknames, usernames, UNC
+/// server/share names, or track/album metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticsEnvironment {
+    schema_version: i32,
+    watched_folders: Option<WatchedFolderCounts>,
+    background_reads: Option<BackgroundReadFlags>,
+    library_counts: Option<LibraryCounts>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WatchedFolderCounts {
+    local: usize,
+    network: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BackgroundReadFlags {
+    loudness: bool,
+    tempo_key: bool,
+    provenance: bool,
+    integrity: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LibraryCounts {
+    songs: i64,
+    albums: i64,
+    unavailable: i64,
+}
+
+fn is_network_path(path: &str) -> bool {
+    path.starts_with("\\\\") || path.starts_with("//")
+}
+
+impl DiagnosticsEnvironment {
+    /// Collects a sanitized summary from `db`. Individual queries degrade to
+    /// `None` if the pool or SQLite read fails so diagnostics export still
+    /// succeeds during a crash.
+    pub fn from_db(db: &crate::db::Database) -> Self {
+        let Ok(conn) = db.pool.get() else {
+            return Self {
+                schema_version: db.schema_version,
+                watched_folders: None,
+                background_reads: None,
+                library_counts: None,
+            };
+        };
+
+        let watched_folders = conn
+            .prepare("SELECT path FROM directories")
+            .and_then(|mut stmt| {
+                let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+                let mut local = 0usize;
+                let mut network = 0usize;
+                for path in rows.flatten() {
+                    if is_network_path(&path) {
+                        network += 1;
+                    } else {
+                        local += 1;
+                    }
+                }
+                Ok(WatchedFolderCounts { local, network })
+            })
+            .ok();
+
+        let verification_enabled =
+            crate::commands::settings::background_verification_enabled(&conn);
+        let background_reads = Some(BackgroundReadFlags {
+            loudness: crate::loudness::is_enabled(&conn),
+            tempo_key: crate::musical::detection_enabled(&conn),
+            provenance: verification_enabled,
+            integrity: verification_enabled,
+        });
+
+        let library_counts = conn
+            .query_row(
+                "SELECT
+                    COUNT(*),
+                    COUNT(DISTINCT NULLIF(album_key, '')),
+                    COALESCE(SUM(CASE WHEN unavailable = 1 THEN 1 ELSE 0 END), 0)
+                 FROM songs",
+                [],
+                |row| {
+                    Ok(LibraryCounts {
+                        songs: row.get(0)?,
+                        albums: row.get(1)?,
+                        unavailable: row.get(2)?,
+                    })
+                },
+            )
+            .ok();
+
+        Self {
+            schema_version: db.schema_version,
+            watched_folders,
+            background_reads,
+            library_counts,
+        }
+    }
+
+    fn write_header_lines(&self, out: &mut String) {
+        if let Some(folders) = self.watched_folders {
+            let total = folders.local + folders.network;
+            if total == 0 {
+                out.push_str("Watched folders: 0\n");
+            } else {
+                out.push_str(&format!(
+                    "Watched folders: {total} ({} local, {} network)\n",
+                    folders.local, folders.network
+                ));
+            }
+        }
+        if let Some(reads) = self.background_reads {
+            let flag = |on: bool| if on { "on" } else { "off" };
+            out.push_str(&format!(
+                "Background reads: loudness={}, tempo/key={}, provenance={}, integrity={}\n",
+                flag(reads.loudness),
+                flag(reads.tempo_key),
+                flag(reads.provenance),
+                flag(reads.integrity),
+            ));
+        }
+        match self.library_counts {
+            Some(counts) => {
+                out.push_str(&format!(
+                    "Database: schema v{} | {} song(s), {} album(s), {} unavailable\n",
+                    self.schema_version, counts.songs, counts.albums, counts.unavailable
+                ));
+            }
+            None => {
+                out.push_str(&format!("Database: schema v{}\n", self.schema_version));
+            }
+        }
+    }
+}
+
 /// Gathers the crash log(s) plus app/OS metadata into a single text blob
 /// for `export_diagnostics` to write wherever the user picks a save path.
 /// Excludes entries older than [`LOG_RETENTION_DAYS`] and caps the combined
 /// bundle at [`MAX_EXPORT_BYTES`], keeping the newest entries.
-pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> String {
+pub fn build_diagnostics_bundle(
+    app_data_dir: &Path,
+    app_version: &str,
+    env: Option<&DiagnosticsEnvironment>,
+) -> String {
     build_diagnostics_bundle_at(
         app_data_dir,
         app_version,
         option_env!("BUILD_COMMIT_HASH").unwrap_or(""),
+        env,
         jiff::Timestamp::now(),
     )
 }
@@ -288,6 +431,7 @@ fn build_diagnostics_bundle_at(
     app_data_dir: &Path,
     app_version: &str,
     commit_hash: &str,
+    env: Option<&DiagnosticsEnvironment>,
     now: jiff::Timestamp,
 ) -> String {
     let path = log_file_path(app_data_dir);
@@ -306,6 +450,9 @@ fn build_diagnostics_bundle_at(
         std::env::consts::OS,
         std::env::consts::ARCH
     ));
+    if let Some(env) = env {
+        env.write_header_lines(&mut out);
+    }
 
     let operations = OPERATIONS.snapshot();
     if !operations.is_empty() {
@@ -399,10 +546,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let now: jiff::Timestamp = "2026-11-21T13:00:00Z".parse().unwrap();
 
-        let with_hash = build_diagnostics_bundle_at(dir.path(), "4.1.0", "dd2826d6", now);
+        let with_hash = build_diagnostics_bundle_at(dir.path(), "4.1.0", "dd2826d6", None, now);
         assert!(with_hash.contains("App version: 4.1.0 (dd2826d6)\n"));
 
-        let without_hash = build_diagnostics_bundle_at(dir.path(), "4.1.0", "", now);
+        let without_hash = build_diagnostics_bundle_at(dir.path(), "4.1.0", "", None, now);
         assert!(without_hash.contains("App version: 4.1.0\n"));
     }
 
@@ -410,7 +557,7 @@ mod tests {
     fn frontend_error_is_appended_and_readable_in_bundle() {
         let dir = tempdir().unwrap();
         log_frontend_error(dir.path(), "boom", Some("at foo.js:1"));
-        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0");
+        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0", None);
         assert!(bundle.contains("FRONTEND ERROR: boom"));
         assert!(bundle.contains("at foo.js:1"));
     }
@@ -419,7 +566,7 @@ mod tests {
     fn recorded_operation_appears_in_bundle() {
         let dir = tempdir().unwrap();
         record_operation("scan (requested): total 1.2s, 3140 files");
-        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0");
+        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0", None);
         assert!(bundle.contains("recent scans and syncs"));
         assert!(bundle.contains("scan (requested): total 1.2s, 3140 files"));
     }
@@ -442,7 +589,7 @@ mod tests {
     #[test]
     fn bundle_notes_absence_of_log_entries() {
         let dir = tempdir().unwrap();
-        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0");
+        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0", None);
         assert!(bundle.contains("no log entries recorded yet"));
     }
 
@@ -468,7 +615,7 @@ mod tests {
         for _ in 0..1000 {
             log_frontend_error(dir.path(), "rapid failure", Some("at render.js:42"));
         }
-        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0");
+        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0", None);
         let occurrences = bundle.matches("rapid failure").count();
         assert_eq!(
             occurrences, 1,
@@ -492,7 +639,7 @@ mod tests {
             log_frontend_error(dir.path(), "first error", None);
         }
         log_frontend_error(dir.path(), "second error", None);
-        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0");
+        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0", None);
         assert!(bundle.contains("FRONTEND ERROR: first error"));
         assert!(bundle.contains("FRONTEND ERROR: (message repeated 5 times)"));
         assert!(bundle.contains("FRONTEND ERROR: second error"));
@@ -519,7 +666,7 @@ stack line 2
         std::fs::write(log_dir.join("crash.log.old"), old_content).unwrap();
         std::fs::write(log_dir.join("crash.log"), current_content).unwrap();
 
-        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", "", now);
+        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", "", None, now);
         assert!(!bundle.contains("stale error"));
         assert!(!bundle.contains("at old.js:1"));
         assert!(!bundle.contains("just over 7 days"));
@@ -576,7 +723,7 @@ stack line 2
         std::fs::write(log_dir.join("crash.log.old"), old_log).unwrap();
         std::fs::write(log_dir.join("crash.log"), cur_log).unwrap();
 
-        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", "", now);
+        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", "", None, now);
         assert!(
             bundle.len() <= MAX_EXPORT_BYTES,
             "Bundle size {} exceeded MAX_EXPORT_BYTES ({MAX_EXPORT_BYTES})",
@@ -585,5 +732,105 @@ stack line 2
         assert!(bundle.contains("older entries omitted to stay within 1 MB limit"));
         assert!(!bundle.contains("old-000"));
         assert!(bundle.contains("new-149"));
+    }
+
+    #[test]
+    fn environment_summary_includes_sanitized_counts_and_flags_without_pii() {
+        let dir = tempdir().unwrap();
+        let db = crate::db::Database::new(dir.path().to_path_buf()).unwrap();
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO directories (path, nickname) VALUES (?1, ?2)",
+                ["C:\\Users\\alice\\Music", "Alice Home"],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO directories (path, nickname) VALUES (?1, ?2)",
+                ["\\\\nas-box.local\\media\\flac", "Secret NAS"],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO directories (path, nickname) VALUES (?1, ?2)",
+                ["//192.168.1.50/music", "SMB Share"],
+            )
+            .unwrap();
+            conn.execute("UPDATE loudness_settings SET enabled = 1 WHERE id = 1", [])
+                .unwrap();
+            conn.execute(
+                "INSERT INTO songs (path, title, artist, album, album_key, unavailable)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                [
+                    "C:\\Users\\alice\\Music\\track1.flac",
+                    "Private Song Title",
+                    "Private Artist",
+                    "Private Album",
+                    "private artist\0private album",
+                    "0",
+                ],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO songs (path, title, artist, album, album_key, unavailable)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                [
+                    "\\\\nas-box.local\\media\\flac\\track2.flac",
+                    "Missing Track",
+                    "Private Artist",
+                    "Private Album",
+                    "private artist\0private album",
+                    "1",
+                ],
+            )
+            .unwrap();
+        }
+
+        let env = DiagnosticsEnvironment::from_db(&db);
+        assert_eq!(
+            env.watched_folders,
+            Some(WatchedFolderCounts {
+                local: 1,
+                network: 2,
+            })
+        );
+        assert_eq!(
+            env.library_counts,
+            Some(LibraryCounts {
+                songs: 2,
+                albums: 1,
+                unavailable: 1,
+            })
+        );
+        assert_eq!(env.background_reads.map(|r| r.loudness), Some(true),);
+
+        let now: jiff::Timestamp = "2026-11-21T13:00:00Z".parse().unwrap();
+        let bundle =
+            build_diagnostics_bundle_at(dir.path(), "2026.11.0", "abc1234", Some(&env), now);
+
+        assert!(bundle.contains("Watched folders: 3 (1 local, 2 network)\n"));
+        assert!(bundle.contains("Background reads: loudness=on,"));
+        assert!(bundle.contains(&format!(
+            "Database: schema v{} | 2 song(s), 1 album(s), 1 unavailable\n",
+            crate::db::CURRENT_SCHEMA_VERSION
+        )));
+
+        // Strict PII check: no paths, usernames, hostnames, IPs, nicknames, or metadata.
+        for forbidden in [
+            "alice",
+            "Alice Home",
+            "nas-box",
+            "Secret NAS",
+            "192.168.1.50",
+            "SMB Share",
+            "Private Song Title",
+            "Private Artist",
+            "Private Album",
+            "track1.flac",
+        ] {
+            assert!(
+                !bundle.contains(forbidden),
+                "diagnostics bundle leaked PII `{forbidden}`:\n{bundle}"
+            );
+        }
     }
 }

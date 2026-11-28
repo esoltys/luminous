@@ -18,10 +18,15 @@ pub async fn log_frontend_error(
 /// frontend has already resolved via a native save dialog (same pattern as
 /// `export_playlist`).
 #[tauri::command]
-pub async fn export_diagnostics(app: AppHandle, export_path: String) -> Result<(), String> {
+pub async fn export_diagnostics(
+    app: AppHandle,
+    state: tauri::State<'_, crate::AppState>,
+    export_path: String,
+) -> Result<(), String> {
     let app_data_dir = crate::paths::resolve_app_data_dir(&app);
     let version = app.package_info().version.to_string();
-    let bundle = crate::diagnostics::build_diagnostics_bundle(&app_data_dir, &version);
+    let env = crate::diagnostics::DiagnosticsEnvironment::from_db(&state.db);
+    let bundle = crate::diagnostics::build_diagnostics_bundle(&app_data_dir, &version, Some(&env));
     std::fs::write(&export_path, bundle).map_err(|e| e.to_string())
 }
 

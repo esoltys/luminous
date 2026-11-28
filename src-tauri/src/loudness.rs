@@ -32,6 +32,11 @@ pub fn get_settings(db: &Database) -> Result<LoudnessSettings> {
     settings_on(&conn)
 }
 
+/// Whether background R128 loudness analysis is currently opted in.
+pub(crate) fn is_enabled(conn: &rusqlite::Connection) -> bool {
+    settings_on(conn).map(|s| s.enabled).unwrap_or(false)
+}
+
 fn settings_on(conn: &rusqlite::Connection) -> Result<LoudnessSettings> {
     let (enabled, target_lufs, mode_str, fallback_gain_db) = conn.query_row(
         "SELECT enabled, target_lufs, mode, fallback_gain_db FROM loudness_settings WHERE id = 1",
@@ -118,8 +123,7 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
         // into loudness normalization — otherwise this would decode the
         // entire library (slow and disk-heavy on external drives) for a
         // feature that's off by default and never gets used.
-        let enabled = settings_on(conn).map(|s| s.enabled).unwrap_or(false);
-        if !enabled {
+        if !is_enabled(conn) {
             return Ok(None);
         }
         conn.query_row(
