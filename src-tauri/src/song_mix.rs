@@ -995,7 +995,7 @@ mod tests {
     }
 
     fn by_artist(picked: &[i64], ids: std::ops::Range<i64>) -> usize {
-        picked.iter().filter(|id| ids.contains(id)).count()
+        picked.iter().filter(|&&id| ids.contains(&id)).count()
     }
 
     #[test]
