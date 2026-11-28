@@ -147,6 +147,8 @@ pub struct ScanReport {
     pub partition_dedup_ms: u128,
     pub partition_stamps_ms: u128,
     pub partition_stat_ms: u128,
+    pub partition_fallback_stats: usize,
+    pub partition_untrustworthy_mtimes: usize,
     pub tag_read_ms: u128,
     pub missing_check_ms: u128,
     pub dr_logs_ms: u128,
@@ -163,10 +165,40 @@ impl ScanReport {
                 trigger.label()
             );
         }
+        let partition_breakdown = if self.partition_ms > 0 {
+            format!(
+                " (reconcile {} ms, dedup {} ms, stamps {} ms, stat {} ms)",
+                self.partition_reconcile_ms,
+                self.partition_dedup_ms,
+                self.partition_stamps_ms,
+                self.partition_stat_ms,
+            )
+        } else {
+            String::new()
+        };
+        let mut stamp_notes = Vec::new();
+        if self.partition_fallback_stats > 0 {
+            stamp_notes.push(format!(
+                "{} fallback stat(s)",
+                self.partition_fallback_stats
+            ));
+        }
+        if self.partition_untrustworthy_mtimes > 0 {
+            stamp_notes.push(format!(
+                "{} untrustworthy mtime(s)",
+                self.partition_untrustworthy_mtimes
+            ));
+        }
+        let stamp_suffix = if stamp_notes.is_empty() {
+            String::new()
+        } else {
+            format!(" [{}]", stamp_notes.join(", "))
+        };
         format!(
             "scan ({}{}): total {} ms | {} dir(s), {} file(s) found, {} CUE sheet(s), \
              {} unchanged, {} re-read, {} failed, {} marked unavailable, {} external change(s) | \
-             discovery {} ms, moved-file reconcile + mtime check {} ms, tag read+write {} ms, missing check {} ms, \
+             discovery {} ms, moved-file reconcile + mtime check {} ms{partition_breakdown}{stamp_suffix}, \
+             tag read+write {} ms, missing check {} ms, \
              DR logs {} ms, artwork {} ms ({} album(s), {} remote fetch(es))",
             trigger.label(),
             if self.force { ", force" } else { "" },
@@ -1709,12 +1741,17 @@ impl CollectionScanner {
             // `stat()` for entries whose metadata wasn't available during walk
             // (#2353, #2421).
             let mut needs_update: Vec<&DiscoveredFile> = Vec::new();
+            for file in &discovered_files {
+                match file.stamp {
+                    DiscoveredStamp::Unavailable if !force => report.partition_fallback_stats += 1,
+                    DiscoveredStamp::Untrustworthy => report.partition_untrustworthy_mtimes += 1,
+                    _ => {}
+                }
+            }
             if force {
                 needs_update.extend(discovered_files.iter());
             } else {
-                let needs_fallback_stat = discovered_files
-                    .iter()
-                    .any(|f| f.stamp == DiscoveredStamp::Unavailable);
+                let needs_fallback_stat = report.partition_fallback_stats > 0;
                 let fallback_stamps: Vec<Option<FileStamp>> = if needs_fallback_stat {
                     scan_pool.install(|| {
                         discovered_files
@@ -6259,5 +6296,35 @@ Official DR value: DR11\n",
             song.art_automatic.as_deref(),
             Some(folder_art_path.to_string_lossy().as_ref())
         );
+    }
+
+    #[test]
+    fn scan_report_summary_includes_partition_sub_timings_and_stamp_fallbacks() {
+        let mut report = ScanReport {
+            total_ms: 500,
+            partition_ms: 120,
+            partition_reconcile_ms: 10,
+            partition_dedup_ms: 5,
+            partition_stamps_ms: 30,
+            partition_stat_ms: 75,
+            partition_fallback_stats: 4,
+            partition_untrustworthy_mtimes: 2,
+            ..ScanReport::default()
+        };
+
+        let summary = report.summary(ScanTrigger::Requested);
+        assert!(summary.contains(
+            "moved-file reconcile + mtime check 120 ms (reconcile 10 ms, dedup 5 ms, stamps 30 ms, stat 75 ms)"
+        ));
+        assert!(summary.contains("[4 fallback stat(s), 2 untrustworthy mtime(s)]"));
+
+        // Zero partition_ms and zero stamp fallbacks omit the extra details.
+        report.partition_ms = 0;
+        report.partition_fallback_stats = 0;
+        report.partition_untrustworthy_mtimes = 0;
+        let quiet = report.summary(ScanTrigger::Startup);
+        assert!(!quiet.contains("reconcile 10 ms"));
+        assert!(!quiet.contains("fallback stat"));
+        assert!(!quiet.contains("untrustworthy mtime"));
     }
 }
