@@ -18,21 +18,16 @@ use std::time::Duration;
 /// Default target size of a generated radio queue.
 pub const DEFAULT_RADIO_LIMIT: usize = 40;
 
-/// Radio's scoring, unchanged from before the shared engine (#2284) until
-/// #2286 / #2288 replace it: up to 3 songs per artist (the seed song
-/// included), and loved songs boosted like 5-star ones.
+/// Radio's tuning: up to 3 songs per artist (the seed song included), and
+/// loved songs boosted like 5-star ones.
 const TUNING: Tuning = Tuning {
     max_per_artist: 3,
-    similar_artist: 5.0,
-    same_artist: 2.0,
-    same_decade: 1.5,
     bpm_window: 15.0,
-    bpm_points: 1.5,
     rating: RatingBoost {
-        loved: 1.5,
-        five: 1.5,
-        four: 1.0,
-        three: 0.5,
+        loved: 1.0,
+        five: 1.0,
+        four: 0.5,
+        three: 0.15,
     },
 };
 
@@ -154,7 +149,7 @@ async fn fetch_listenbrainz_similar_artists(artist_mbid: &str) -> HashMap<String
     let max_score = items.iter().filter_map(|i| i.score).fold(0.0f64, f64::max);
     for item in items {
         let norm = if max_score > 0.0 {
-            item.score.unwrap_or(0.0) / max_score
+            (item.score.unwrap_or(0.0).max(0.0) / max_score).clamp(0.0, 1.0)
         } else {
             0.5
         };

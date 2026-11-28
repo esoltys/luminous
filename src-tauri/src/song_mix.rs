@@ -16,44 +16,34 @@ use rand::RngExt;
 use rusqlite::{params_from_iter, Connection};
 use std::collections::{HashMap, HashSet};
 
-/// Score points per factor of e in a match's sampling weight: each point
-/// makes a song about twice as likely to be drawn next. Scores are additive
-/// points, so weighting by the raw score would let a large pool of weak
-/// matches outdraw a few strong ones; the exponential keeps strong matches
-/// dominant while weaker ones still turn up. Goes when #2286 replaces the
-/// additive score with weights of its own.
-const WEIGHT_SCALE: f64 = 1.5;
-/// Points per shared genre, and how many shared genres count.
-const GENRE_POINTS: f64 = 3.0;
-const MAX_SHARED_GENRES: usize = 2;
-/// Points per shared artist tag (`artist_profiles.tags`), and how many count.
-const TAG_POINTS: f64 = 2.0;
-const MAX_SHARED_TAGS: usize = 3;
+/// Artist score for seed artist(s); highest band so the seed catalogue leads.
+const SEED_ARTIST_SCORE: f64 = 1.0;
+/// ListenBrainz similar artists score in `[0.35, 0.95]` (`BASE + SPAN * match`),
+/// keeping collaborative-filtering matches above genre-only fallbacks.
+const SIMILAR_ARTIST_BASE: f64 = 0.35;
+const SIMILAR_ARTIST_SPAN: f64 = 0.60;
+/// Genre/tag-only artists score in `[0.15, 0.60]` (`BASE + SPAN * overlap`),
+/// scaled by the fraction of the profile's genres (or tags) that match.
+const GENRE_ONLY_BASE: f64 = 0.15;
+const GENRE_ONLY_SPAN: f64 = 0.45;
+/// Song-level multipliers applied on top of a positive artist score.
+const DECADE_MULTIPLIER: f64 = 1.25;
+const BPM_MAX_BONUS: f64 = 0.25;
 
-/// The scoring constants a caller tunes. Transitional: they exist so Radio
-/// and Auto Continue keep their pre-#2284 behaviour exactly; #2286 and #2288
-/// replace the additive scoring and remove most of these.
+/// The scoring constants a caller tunes.
 #[derive(Debug, Clone, Copy)]
 pub struct Tuning {
     /// At most this many picked songs per artist (`artist_key`), the lead
     /// song included.
     pub max_per_artist: usize,
-    /// Points for a ListenBrainz-similar artist, scaled by its 0–1 match.
-    pub similar_artist: f64,
-    /// Points when the candidate's artist is a seed artist.
-    pub same_artist: f64,
-    /// Points when the candidate's decade is a seed decade.
-    pub same_decade: f64,
-    /// BPM difference at which the tempo bonus drops to zero.
+    /// BPM difference at which the tempo multiplier drops to 1.0.
     pub bpm_window: f32,
-    /// Tempo bonus at an exact BPM match, falling linearly to the window.
-    pub bpm_points: f32,
-    /// Boost added on top of a real match (never on its own).
+    /// Transitional multiplier boost by star rating / loved until #2288.
     pub rating: RatingBoost,
 }
 
-/// Boost by star rating (0–5), and for loved songs; a loved song gets the
-/// larger of `loved` and its rating tier.
+/// Additive multiplier bonus by star rating (0–5) and loved status (`1.0 + bonus`);
+/// a loved song gets the larger of `loved` and its rating tier.
 #[derive(Debug, Clone, Copy)]
 pub struct RatingBoost {
     pub loved: f64,
@@ -191,10 +181,22 @@ impl Profile {
         self.similar_artists = similar;
     }
 
-    /// How well `c` fits. Zero means "nothing in common": only positive
-    /// scores count as matches; the rest are fallback material.
-    fn similarity(&self, c: &Candidate, pool: &Pool, t: &Tuning) -> f64 {
-        let mut score = 0.0;
+    /// Tiered artist/match score in `[0.0, 1.0]`:
+    /// - Seed artist(s): `1.0` (whole catalogue qualifies).
+    /// - ListenBrainz-similar artists: `0.35 + 0.6 * match` (whole catalogue qualifies).
+    /// - Other artists: `0.15 + 0.45 * overlap` using the song's own genres,
+    ///   falling back to `artist_profiles` tags when the song has no genre
+    ///   (or the profile has no genres).
+    /// - Otherwise: `0.0` (unmatched).
+    fn artist_score(&self, c: &Candidate, pool: &Pool) -> f64 {
+        let is_seed_artist = c
+            .artist_key
+            .as_ref()
+            .is_some_and(|a| self.artist_keys.contains(a))
+            || c.artists.iter().any(|a| self.artist_keys.contains(a));
+        if is_seed_artist {
+            return SEED_ARTIST_SCORE;
+        }
 
         let lb_match = c
             .artists
@@ -202,42 +204,66 @@ impl Profile {
             .chain(c.artist_key.iter())
             .chain(c.musicbrainz_artist_id.iter())
             .filter_map(|a| self.similar_artists.get(a))
-            .fold(0.0f64, |m, &s| m.max(s));
+            .fold(0.0f64, |m, &s| m.max(s))
+            .clamp(0.0, 1.0);
         if lb_match > 0.0 {
-            score += t.similar_artist * lb_match.clamp(0.1, 1.0);
+            return SIMILAR_ARTIST_BASE + SIMILAR_ARTIST_SPAN * lb_match;
         }
 
-        let shared_genres = c.genres.iter().filter(|g| self.genres.contains(*g)).count();
-        score += GENRE_POINTS * shared_genres.min(MAX_SHARED_GENRES) as f64;
-
-        let cand_tags: HashSet<&String> = pool.tags_for(c).collect();
-        let shared_tags = cand_tags.iter().filter(|t| self.tags.contains(**t)).count();
-        score += TAG_POINTS * shared_tags.min(MAX_SHARED_TAGS) as f64;
-
-        if c.artist_key
-            .as_ref()
-            .is_some_and(|a| self.artist_keys.contains(a))
-        {
-            score += t.same_artist;
+        let (shared, total) = if !c.genres.is_empty() && !self.genres.is_empty() {
+            (
+                c.genres.iter().filter(|g| self.genres.contains(*g)).count(),
+                self.genres.len(),
+            )
+        } else if !self.tags.is_empty() {
+            let cand_tags: HashSet<&String> = pool.tags_for(c).collect();
+            (
+                cand_tags.iter().filter(|t| self.tags.contains(**t)).count(),
+                self.tags.len(),
+            )
+        } else {
+            (0, 0)
+        };
+        if shared > 0 && total > 0 {
+            let ratio = (shared as f64 / total as f64).min(1.0);
+            return GENRE_ONLY_BASE + GENRE_ONLY_SPAN * ratio;
         }
-        if c.decade.is_some_and(|d| self.decades.contains(&d)) {
-            score += t.same_decade;
+
+        0.0
+    }
+
+    /// Sampling weight for `c`: `artist_score * song_multipliers`, or `0.0`
+    /// when `c` has no artist/genre/tag link to the profile. Decade and BPM
+    /// multiply an existing match rather than qualifying a song on their own.
+    fn song_weight(&self, c: &Candidate, pool: &Pool, t: &Tuning) -> f64 {
+        let base = self.artist_score(c, pool);
+        if base <= 0.0 {
+            return 0.0;
         }
-        if let Some(bpm) = c.bpm.filter(|b| *b > 0.0) {
+        let decade_mult = if c.decade.is_some_and(|d| self.decades.contains(&d)) {
+            DECADE_MULTIPLIER
+        } else {
+            1.0
+        };
+        let bpm_mult = if let Some(bpm) = c.bpm.filter(|b| *b > 0.0) {
             let closest = self
                 .bpms
                 .iter()
                 .map(|s| (s - bpm).abs())
                 .fold(f32::INFINITY, f32::min);
             if closest < t.bpm_window {
-                score += ((1.0 - closest / t.bpm_window) * t.bpm_points) as f64;
+                1.0 + BPM_MAX_BONUS * (1.0 - closest / t.bpm_window) as f64
+            } else {
+                1.0
             }
-        }
-        score
+        } else {
+            1.0
+        };
+        base * decade_mult * bpm_mult * rating_multiplier(c, &t.rating)
     }
 }
 
-fn rating_boost(c: &Candidate, r: &RatingBoost) -> f64 {
+fn rating_multiplier(c: &Candidate, r: &RatingBoost) -> f64 {
     let by_rating = if c.rating >= 5.0 {
         r.five
     } else if c.rating >= 4.0 {
@@ -247,11 +273,12 @@ fn rating_boost(c: &Candidate, r: &RatingBoost) -> f64 {
     } else {
         0.0
     };
-    if c.loved == 1 {
+    let bonus = if c.loved == 1 {
         by_rating.max(r.loved)
     } else {
         by_rating
-    }
+    };
+    1.0 + bonus.max(0.0)
 }
 
 /// What a caller asks `pick` for.
@@ -271,11 +298,11 @@ pub struct MixOptions<'a> {
 ///
 /// Never returns a seed song (other than the lead) or an excluded song, and
 /// never more than `tuning.max_per_artist` songs by one artist, counting the
-/// lead. Matching songs come first, drawn at random with each better fit
-/// much more likely to be drawn (see `WEIGHT_SCALE`), so every call differs
-/// and strong matches usually, but not always, lead. Unmatched eligible songs follow in random order,
-/// then deferred recent plays. Returns fewer than `limit` only when no
-/// eligible song is left under its artist's cap.
+/// lead. Matching songs come first, drawn at random weighted by artist tier
+/// and song fit, so every call differs and strong matches usually, but not
+/// always, lead. Unmatched eligible songs follow in random order, then
+/// deferred recent plays. Returns fewer than `limit` only when no eligible
+/// song is left under its artist's cap.
 pub fn pick(
     profile: &Profile,
     pool: &Pool,
@@ -307,9 +334,8 @@ pub fn pick(
             if deferred {
                 return (Tier::Deferred, 1.0, c);
             }
-            let s = profile.similarity(c, pool, t);
-            if s > 0.0 {
-                let w = match_weight(s + rating_boost(c, &t.rating));
+            let w = profile.song_weight(c, pool, t);
+            if w > 0.0 {
                 (Tier::Match, w, c)
             } else {
                 (Tier::Unmatched, 1.0, c)
@@ -343,11 +369,6 @@ enum Tier {
     Unmatched,
     /// Played since `MixOptions::defer_played_since`: used last.
     Deferred,
-}
-
-/// Sampling weight for a match's score (similarity plus rating boost).
-fn match_weight(score: f64) -> f64 {
-    (score / WEIGHT_SCALE).exp()
 }
 
 /// Orders `entries` by tier, and within a tier by weighted random sampling
@@ -516,16 +537,12 @@ mod tests {
 
     const TUNING: Tuning = Tuning {
         max_per_artist: 2,
-        similar_artist: 5.0,
-        same_artist: 2.0,
-        same_decade: 1.5,
         bpm_window: 15.0,
-        bpm_points: 1.5,
         rating: RatingBoost {
-            loved: 1.5,
-            five: 1.5,
-            four: 1.0,
-            three: 0.5,
+            loved: 1.0,
+            five: 1.0,
+            four: 0.5,
+            three: 0.15,
         },
     };
 
@@ -584,41 +601,92 @@ mod tests {
     }
 
     #[test]
-    fn similar_artists_score_well_above_genre_only_matches() {
+    fn similar_artist_with_no_genre_overlap_outranks_same_genre_artist() {
         let p = pool(vec![]);
         let mut profile = Profile::default();
         profile.genres.insert("rock".to_string());
+        profile.genres.insert("pop".to_string());
+        profile.decades.insert(1980);
+        profile.bpms.push(120.0);
         profile.set_similar_artists(HashMap::from([(
             "electric light orchestra".to_string(),
             0.9,
         )]));
-        let similar = test_song(2, "Electric Light Orchestra", &["Rock"], Some(1970), None);
-        let other = test_song(3, "Unknown Band", &["Rock"], Some(1970), None);
+        // No genre, decade, or BPM overlap, but strong ListenBrainz similarity.
+        let similar = test_song(
+            2,
+            "Electric Light Orchestra",
+            &["Synthpop"],
+            Some(1970),
+            Some(90.0),
+        );
+        // Shares 1 of 2 profile genres, same decade, and exact BPM.
+        let genre_only = test_song(3, "Unknown Band", &["Rock"], Some(1980), Some(120.0));
         assert!(
-            profile.similarity(&similar, &p, &TUNING)
-                > profile.similarity(&other, &p, &TUNING) + 3.0
+            profile.song_weight(&similar, &p, &TUNING)
+                > profile.song_weight(&genre_only, &p, &TUNING)
         );
     }
 
     #[test]
-    fn similarity_counts_genres_tags_decades_and_bpm() {
+    fn decade_and_bpm_only_matches_are_excluded_when_real_matches_exist() {
+        let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
+        let lib = vec![
+            // Same decade and exact BPM, but unrelated genre -> weight 0 (Unmatched).
+            song(10, "X", &["Jazz"], 1980, 120.0),
+            // Real genre match, different decade and BPM.
+            song(11, "Y", &["Rock"], 2010, 80.0),
+        ];
+        assert_eq!(pick_default(&seeds, lib, 1), vec![11]);
+    }
+
+    #[test]
+    fn seed_and_similar_artists_contribute_whole_catalogue_while_genre_only_filters_by_song_genre()
+    {
         let p = Pool {
             artist_tags: HashMap::from([(
-                "rush".to_string(),
-                HashSet::from(["virtuoso".to_string()]),
+                "genre_artist".to_string(),
+                HashSet::from(["prog".to_string()]),
             )]),
             ..Default::default()
         };
         let mut profile = Profile::default();
+        profile.artist_keys.insert("seed_artist".to_string());
+        profile.genres.insert("rock".to_string());
+        profile.tags.insert("prog".to_string());
+        profile.set_similar_artists(HashMap::from([("sim_artist".to_string(), 0.8)]));
+
+        // Seed & similar artists qualify even on songs with an unrelated genre.
+        let seed_diff_genre = test_song(1, "seed_artist", &["Ambient"], None, None);
+        let sim_diff_genre = test_song(2, "sim_artist", &["Ambient"], None, None);
+        assert_eq!(profile.artist_score(&seed_diff_genre, &p), 1.0);
+        assert!((profile.artist_score(&sim_diff_genre, &p) - (0.35 + 0.6 * 0.8)).abs() < 1e-9);
+
+        // Genre-only artist: song with a non-matching genre does NOT fall back to artist tags.
+        let wrong_genre_with_tag = test_song(3, "genre_artist", &["Jazz"], None, None);
+        assert_eq!(profile.artist_score(&wrong_genre_with_tag, &p), 0.0);
+
+        // Genre-only artist: song with NO genre falls back to artist_profiles tags.
+        let no_genre_with_tag = test_song(4, "genre_artist", &[], None, None);
+        assert!(profile.artist_score(&no_genre_with_tag, &p) > 0.0);
+    }
+
+    #[test]
+    fn song_weight_applies_decade_and_bpm_multipliers_on_matches() {
+        let p = Pool::default();
+        let mut profile = Profile::default();
         profile.genres.insert("prog-rock".to_string());
-        profile.tags.insert("virtuoso".to_string());
         profile.decades.insert(1980);
         profile.bpms.push(120.0);
 
-        let matching = test_song(1, "Rush", &["Prog-Rock"], Some(1980), Some(121.0));
-        let unrelated = test_song(2, "Other", &["Classical"], Some(1920), Some(60.0));
-        assert!(profile.similarity(&matching, &p, &TUNING) > 7.0);
-        assert_eq!(profile.similarity(&unrelated, &p, &TUNING), 0.0);
+        let boosted = test_song(1, "Rush", &["Prog-Rock"], Some(1980), Some(121.0));
+        let base_only = test_song(2, "Rush", &["Prog-Rock"], Some(2010), Some(60.0));
+        let unrelated = test_song(3, "Other", &["Classical"], Some(1980), Some(120.0));
+        assert!(
+            profile.song_weight(&boosted, &p, &TUNING)
+                > profile.song_weight(&base_only, &p, &TUNING)
+        );
+        assert_eq!(profile.song_weight(&unrelated, &p, &TUNING), 0.0);
     }
 
     /// How often each id is picked first, over `runs` seeds.
@@ -671,9 +739,18 @@ mod tests {
     }
 
     #[test]
-    fn each_score_point_roughly_doubles_the_weight() {
-        let ratio = match_weight(7.0) / match_weight(6.0);
-        assert!((1.8..2.1).contains(&ratio), "ratio {ratio}");
+    fn artist_bands_keep_seed_above_similar_above_genre_only() {
+        let p = Pool::default();
+        let mut profile = Profile::default();
+        profile.artist_keys.insert("seed".to_string());
+        profile.genres.insert("rock".to_string());
+        profile.set_similar_artists(HashMap::from([("sim".to_string(), 0.9)]));
+
+        let seed_song = test_song(1, "seed", &["Rock"], None, None);
+        let sim_song = test_song(2, "sim", &["Rock"], None, None);
+        let genre_song = test_song(3, "other", &["Rock"], None, None);
+        assert!(profile.artist_score(&seed_song, &p) > profile.artist_score(&sim_song, &p));
+        assert!(profile.artist_score(&sim_song, &p) > profile.artist_score(&genre_song, &p));
     }
 
     #[test]
