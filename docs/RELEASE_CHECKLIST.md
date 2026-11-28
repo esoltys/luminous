@@ -1,9 +1,14 @@
 # Release Checklist
 
-Steps to work through before cutting a Luminous release. `bun run release <version>`
+Steps to work through before cutting a Luminous release. `bun run release`
 (see [`scripts/release.ts`](../scripts/release.ts)) automates version bump + `bun run
 check` + `bun run test:run` + `cargo check` + commit + tag, but everything below it is
 manual.
+
+Versions are calendar versions, `YYYY.M.PATCH` (rules in
+[`scripts/calver.ts`](../scripts/calver.ts)); `vX.Y.Z` below stands for `v<YYYY.M.PATCH>`.
+Run `bun run version:next` at the start to learn the version this release takes, and use it
+for the release notes and perf runs. Re-run it if the release slips into a new UTC month.
 
 ## Scope
 
@@ -109,8 +114,8 @@ manual.
 - [ ] **If this release is being run from a Cloud Environment (not a local machine),
       stop here and notify the user.** Cutting a release requires local execution —
       don't proceed with the steps below from a cloud/remote environment.
-- [ ] `bun run release <version>` to bump the version, run checks, commit, and tag
-      locally on the release worktree branch. Don't pass `--push` — that pushes the
+- [ ] `bun run release` to bump to the next calendar version, run checks, commit, and tag
+      locally on the release worktree branch. Pass a version only to override it. Don't pass `--push` — that pushes the
       branch straight to `main`, bypassing branch protection and skipping review.
 - [ ] Open a PR from the release branch into `main` and get it reviewed/merged like any
       other change. If the release only bundles fixes already merged to `main` (a

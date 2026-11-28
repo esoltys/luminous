@@ -211,9 +211,9 @@ Follow [docs/ISSUES_AND_PRS.md](docs/ISSUES_AND_PRS.md) before creating an issue
 
 ## Release & Versioning
 
-- `bun run bump-version` — updates the version in `package.json` + `Cargo.toml`.
-- `bun run release` — runs tests, builds, and creates a GitHub release with a `v<version>` tag.
-- When tagging a new release, only create and push a single semantic version tag matching the repository's convention (`vX.Y.Z` where X.Y.Z matches the project version in `package.json`/`Cargo.toml`) to avoid triggering duplicate build workflows in GitHub Actions.
+- Versions are calendar versions, `YYYY.M.PATCH` (e.g. `2026.11.0`): `M` is never zero-padded (Cargo parses it as SemVer), and `PATCH` counts releases within the UTC month from `0`. 4.0.0 and 4.1.0 were 2026.11.0 and 2026.11.1. The MSIX version is the same plus `.0`, which `tauri-windows-bundle` appends. The rules live in `scripts/calver.ts`.
+- `bun run version:next` prints the next version (from today's UTC date, the `v*` tags and `package.json`); `bun run bump-version` and `bun run release` use it when no version is passed. The bump updates `package.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock` and the AppStream metainfo.
+- When tagging a new release, only create and push a single tag, `v<YYYY.M.PATCH>` matching the version in `package.json`/`Cargo.toml`, to avoid triggering duplicate build workflows in GitHub Actions.
 
 ## User Guide
 

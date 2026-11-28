@@ -3,7 +3,8 @@ name: release
 description: Cut a Luminous release by working through docs/RELEASE_CHECKLIST.md
 ---
 
-Cut release $ARGUMENTS.
+Cut release $ARGUMENTS. Versions are `YYYY.M.PATCH` calendar versions; with no argument, the
+version is whatever `bun run version:next` prints. `vX.Y.Z` below means `v<YYYY.M.PATCH>`.
 
 [docs/RELEASE_CHECKLIST.md](../../../docs/RELEASE_CHECKLIST.md) is the source of truth — it's
 actively maintained. Re-read it before starting. If anything below has drifted from it, the
@@ -50,7 +51,7 @@ needs updating to match. Work through it in order:
    Re-run the previous release's baseline the same day before reading a scan-time delta as a
    regression: scan times drift with the drive.
    Confirm the Security Audit and CodeQL workflows are green on `main`.
-5. **Cut it**: `bun run release <version>` (no `--push` — that would push straight to `main` and
+5. **Cut it**: `bun run release` (pass the version only to override `version:next`; no `--push` — that would push straight to `main` and
    bypass review) to bump the version, run its own checks, commit, and tag locally on the release
    branch.
 6. **PR**: open a PR from the release branch into `main` using the repo PR template. NEVER push
