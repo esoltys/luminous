@@ -235,4 +235,31 @@ mod tests {
         assert_eq!(picked.iter().filter(|id| (10..16).contains(*id)).count(), 2);
         assert!(picked.contains(&30), "{picked:?}");
     }
+
+    #[test]
+    fn similar_artists_outrank_genre_only_matches_for_multi_seed_continue() {
+        let seed_a = test_song(1, "Seed A", &["Rock"], Some(1990), Some(120.0));
+        let seed_b = test_song(2, "Seed B", &["Indie"], Some(1992), Some(122.0));
+        let sim_pick = test_song(
+            10,
+            "Similar Artist",
+            &["Electronic"],
+            Some(1991),
+            Some(121.0),
+        );
+        let genre_only = test_song(20, "Genre Only", &["Rock"], Some(1991), Some(121.0));
+        let pool = Pool {
+            candidates: vec![seed_a.clone(), seed_b.clone(), sim_pick, genre_only],
+            ..Default::default()
+        };
+        let mut profile = Profile::from_seeds(&[seed_a, seed_b], &pool);
+        profile.set_similar_artists(HashMap::from([("similar artist".to_string(), 0.9)]));
+        let picked = song_mix::pick(
+            &profile,
+            &pool,
+            &mix_options(NOW, 1, None),
+            &mut StdRng::seed_from_u64(11),
+        );
+        assert_eq!(picked, vec![10]);
+    }
 }

@@ -45,20 +45,18 @@ impl SimilarArtistsCache {
         Self::default()
     }
 
-    /// Returns a cached similar-artist map for `mbid`, if present.
-    pub fn get(&self, mbid: &str) -> Option<HashMap<String, f64>> {
+    fn get(&self, mbid: &str) -> Option<HashMap<String, f64>> {
         self.entries.lock().get(mbid).cloned()
     }
 
-    /// Stores a similar-artist map for `mbid`.
-    pub fn insert(&self, mbid: String, map: HashMap<String, f64>) {
+    fn insert(&self, mbid: String, map: HashMap<String, f64>) {
         self.entries.lock().insert(mbid, map);
     }
 }
 
 /// Resolves an artist's MusicBrainz ID from a song tag candidate first, then
 /// `artist_profiles.musicbrainz_artist_id` (case-insensitive).
-pub fn resolve_artist_mbid(
+fn resolve_artist_mbid(
     conn: &Connection,
     artist: &str,
     candidate_mbid: Option<&str>,
@@ -145,7 +143,7 @@ async fn fetch_listenbrainz_similar_artists(
 
 /// Merges per-seed similar-artist maps, keeping the highest `match` score for
 /// each similar artist key.
-pub fn merge_similar_artists(
+fn merge_similar_artists(
     maps: impl IntoIterator<Item = HashMap<String, f64>>,
 ) -> HashMap<String, f64> {
     let mut merged = HashMap::new();
@@ -221,9 +219,8 @@ where
 }
 
 /// Resolves up to [`MAX_SEED_ARTISTS`] unique seed artists' MBIDs, fetches
-/// ListenBrainz similar artists in parallel for cache misses (each bounded by a
-/// 2.5 s timeout), and merges results by keeping the highest `match` score per
-/// similar artist.
+/// ListenBrainz similar artists in parallel for cache misses, and merges
+/// results by keeping the highest `match` score per similar artist.
 ///
 /// Returns an empty map when offline or when no MBIDs or matches are available.
 pub async fn resolve_for_seeds(
