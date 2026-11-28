@@ -18,10 +18,8 @@ use std::time::Duration;
 /// Default target size of a generated radio queue.
 pub const DEFAULT_RADIO_LIMIT: usize = 40;
 
-/// Radio's tuning: up to 3 songs per artist (the seed song included), and
-/// loved songs boosted like 5-star ones.
+/// Radio's tuning: loved songs boosted like 5-star ones.
 const TUNING: Tuning = Tuning {
-    max_per_artist: 3,
     bpm_window: 15.0,
     rating: RatingBoost {
         loved: 1.0,
@@ -290,18 +288,18 @@ mod tests {
     use rand::SeedableRng;
 
     #[test]
-    fn seed_song_leads_and_caps_each_artist_at_three() {
+    fn seed_song_leads_and_its_artist_is_capped_at_a_quarter_of_the_queue() {
+        // A 40-song radio: the seed artist's cap is ceil(40 / 4) = 10, the
+        // seed song first. 30 single-song bands fill the rest exactly, so the
+        // cap is reached and nothing over it is needed.
         let seed = test_song(1, "The Beatles", &["Rock"], Some(1960), None);
         let pool = Pool {
-            candidates: (1..=10)
+            candidates: (1..=30)
                 .map(|i| test_song(i, "The Beatles", &["Rock"], Some(1960), None))
-                .chain([test_song(
-                    11,
-                    "The Rolling Stones",
-                    &["Rock"],
-                    Some(1960),
-                    None,
-                )])
+                .chain(
+                    (100..130)
+                        .map(|i| test_song(i, &format!("Band {i}"), &["Rock"], Some(1960), None)),
+                )
                 .collect(),
             ..Default::default()
         };
@@ -309,12 +307,12 @@ mod tests {
         let picked = song_mix::pick(
             &profile,
             &pool,
-            &mix_options(10),
+            &mix_options(DEFAULT_RADIO_LIMIT),
             &mut StdRng::seed_from_u64(42),
         );
+        assert_eq!(picked.len(), DEFAULT_RADIO_LIMIT);
         assert_eq!(picked.first(), Some(&1));
-        assert_eq!(picked.iter().filter(|&&id| id <= 10).count(), 3);
-        assert!(picked.contains(&11));
+        assert_eq!(picked.iter().filter(|&&id| id <= 30).count(), 10);
     }
 
     #[test]
