@@ -7,7 +7,7 @@
 //! rather than just the final one. Choosing the songs is `song_mix`'s job;
 //! this module decides when to top up, what seeds it, and appends the batch.
 
-use crate::song_mix::{self, MixOptions, Pool, Profile, RatingBoost, Tuning};
+use crate::song_mix::{self, MixOptions, Pool, Profile, Tuning};
 use crate::AppState;
 use anyhow::Result;
 use rusqlite::Connection;
@@ -23,24 +23,12 @@ pub const SEED_COUNT: usize = 3;
 /// before the last song ends, so the next one is already queued and the
 /// engine's gapless preload still has something to prime.
 pub const TOP_UP_THRESHOLD: usize = 1;
-/// Songs played within this window go last, so the mix favours songs the
-/// user hasn't heard lately.
-pub const RECENT_PLAY_WINDOW_SECS: i64 = 3 * 24 * 60 * 60;
 /// `playlist_items.additional_metadata` marker on appended rows — the Queue
 /// view draws its "Auto Continue" divider before the first one.
 pub const MARKER_JSON: &str = r#"{"autoContinue":true}"#;
 
-/// Auto Continue's tuning: a tighter tempo window than Radio's, and only
-/// rated songs boosted.
-const TUNING: Tuning = Tuning {
-    bpm_window: 12.0,
-    rating: RatingBoost {
-        loved: 0.0,
-        five: 1.0,
-        four: 0.5,
-        three: 0.0,
-    },
-};
+/// Auto Continue's tuning: a tighter tempo window than Radio's.
+const TUNING: Tuning = Tuning { bpm_window: 12.0 };
 
 /// What a top-up is built from, captured under one `Player` lock by
 /// `Player::auto_continue_seed`.
@@ -62,8 +50,8 @@ fn mix_options(now: i64, count: usize, after_artist: Option<&str>) -> MixOptions
     MixOptions {
         limit: count,
         lead_with_seed: false,
+        now,
         after_artist,
-        defer_played_since: Some(now - RECENT_PLAY_WINDOW_SECS),
         tuning: &TUNING,
     }
 }
@@ -190,7 +178,7 @@ mod tests {
     const NOW: i64 = 1_800_000_000;
 
     #[test]
-    fn defers_recent_plays_and_caps_each_artist_at_two() {
+    fn caps_each_artist_at_two_and_avoids_recent_play_when_unplayed_matches_exist() {
         let seed = test_song(1, "A", &["Rock"], Some(1980), Some(120.0));
         let mut recent = test_song(30, "Fresh Pick", &["Rock"], Some(1980), Some(120.0));
         recent.lastplayed = Some(NOW - 60);
@@ -205,16 +193,16 @@ mod tests {
             ..Default::default()
         };
         let profile = Profile::from_seeds(&[seed], &pool);
+        // "Same" hits its per-artist cap of 2; "Fresh Pick" is a penalized
+        // match (x0.15) so it still beats the unmatched "Other" song.
         let picked = song_mix::pick(
             &profile,
             &pool,
             &mix_options(NOW, 3, None),
             &mut StdRng::seed_from_u64(7),
         );
-        // Two "Same" matches (the cap), then the unrelated song takes the
-        // last slot ahead of the recently played match.
         assert_eq!(picked.len(), 3);
         assert_eq!(picked.iter().filter(|id| (10..16).contains(*id)).count(), 2);
-        assert!(picked.contains(&20), "{picked:?}");
+        assert!(picked.contains(&30), "{picked:?}");
     }
 }
