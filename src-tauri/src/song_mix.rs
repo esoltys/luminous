@@ -307,9 +307,9 @@ pub struct MixOptions<'a> {
 /// tier is exhausted and the mix would otherwise come up short. So fewer than
 /// `limit` ids come back only when the pool has no more eligible songs.
 ///
-/// The result is ordered by `spread_artists`, so the same artist never plays
-/// twice in a row unless the picked songs leave no other arrangement; the
-/// lead stays at index 0.
+/// Play order is independent of draw order: the lead stays at index 0 and
+/// each artist's songs are spread evenly through the rest, never two in a
+/// row unless the picked songs leave no other arrangement.
 pub fn pick(
     profile: &Profile,
     pool: &Pool,
@@ -408,21 +408,23 @@ fn damp_large_catalogues(entries: &mut [(Tier, f64, &Candidate)]) {
 /// Orders `songs` (id and artist key) so each artist's songs are spread
 /// evenly through the list and no artist plays twice in a row (counting
 /// `after`, the artist just before the list), whenever such an order exists.
-/// Songs with no artist key never count as repeats.
-///
-/// Every artist gets a random phase `u` in `[0, 1)`; its `j`-th song (of `n`,
-/// in the order given) aims for the fractional position `(j + u) / n`, so a
-/// heavy artist lands every few slots instead of bunching at the front, and
-/// single-song artists fall in random order. Slots are filled in order of
-/// aim, skipping the artist just placed, and an artist whose songs left would
-/// otherwise become impossible to keep apart is placed first. When no order
-/// avoids repeats (one artist has too many songs), the artist with the most
-/// songs left goes next, which keeps repeats to the minimum.
+/// When no order avoids repeats, the result has as few as possible. Songs
+/// with no artist key never count as repeats; one artist's songs keep the
+/// order given; the arrangement is otherwise random.
 fn spread_artists(
     songs: &[(i64, Option<&str>)],
     after: Option<&str>,
     rng: &mut impl rand::Rng,
 ) -> Vec<i64> {
+    // Every artist gets a random phase `u` in [0, 1); its `j`-th song of `n`
+    // aims for the fractional position `(j + u) / n`, so a heavy artist
+    // lands every few slots instead of bunching at the front, and single-song
+    // artists fall in random order. (A fixed phase would give every
+    // single-song artist the same aim and bring the bunching back.) Slots are
+    // filled in order of aim, skipping the artist just placed, but an artist
+    // whose songs left would otherwise become impossible to keep apart is
+    // placed first. With no order free of repeats, the artist with the most
+    // songs left goes next.
     // One group per artist key, in first-appearance order; every unkeyed
     // song is its own group.
     struct Group<'a> {
@@ -473,17 +475,25 @@ fn spread_artists(
         // ceil(slots_after / 2). Unkeyed groups hold one song, so only keyed
         // groups can break this, and only the two with the most songs left
         // need checking, which keeps each slot linear in the artist count.
-        let (mut most, mut runner_up) = ((usize::MAX, 0), 0);
+        // `fullest` is the keyed group with the most songs left (index,
+        // count); `runner_up` the next-highest count among the rest.
+        let mut fullest: Option<(usize, usize)> = None;
+        let mut runner_up = 0;
         for (gi, g) in groups.iter().enumerate().filter(|(_, g)| g.key.is_some()) {
-            if g.left() > most.1 {
-                runner_up = most.1;
-                most = (gi, g.left());
-            } else if g.left() > runner_up {
-                runner_up = g.left();
+            match fullest {
+                Some((_, most)) if g.left() <= most => runner_up = runner_up.max(g.left()),
+                _ => {
+                    runner_up = fullest.map_or(0, |(_, most)| most);
+                    fullest = Some((gi, g.left()));
+                }
             }
         }
         let keeps_order_possible = |gi: usize| {
-            let others_most = if gi == most.0 { runner_up } else { most.1 };
+            let others_most = match fullest {
+                Some((fi, _)) if fi == gi => runner_up,
+                Some((_, most)) => most,
+                None => 0,
+            };
             let own_ok = groups[gi].key.is_none() || groups[gi].left() - 1 <= slots_after / 2;
             own_ok && others_most <= slots_after.div_ceil(2)
         };
@@ -1074,23 +1084,30 @@ mod tests {
         );
     }
 
-    /// Whether `counts` (songs per artist) can be ordered with no artist
-    /// twice in a row and not starting with artist `after` — by brute force.
-    fn arrangeable(counts: &mut [usize], after: Option<usize>) -> bool {
+    /// The fewest repeats any order of `counts` (songs per artist) can have,
+    /// following artist `after`: brute force over every order, memoised.
+    fn min_repeats(
+        counts: &mut Vec<usize>,
+        after: Option<usize>,
+        memo: &mut HashMap<(Vec<usize>, Option<usize>), usize>,
+    ) -> usize {
         if counts.iter().all(|&n| n == 0) {
-            return true;
+            return 0;
         }
+        if let Some(&m) = memo.get(&(counts.clone(), after)) {
+            return m;
+        }
+        let mut best = usize::MAX;
         for a in 0..counts.len() {
-            if counts[a] > 0 && Some(a) != after {
+            if counts[a] > 0 {
                 counts[a] -= 1;
-                let ok = arrangeable(counts, Some(a));
+                let r = usize::from(after == Some(a)) + min_repeats(counts, Some(a), memo);
                 counts[a] += 1;
-                if ok {
-                    return true;
-                }
+                best = best.min(r);
             }
         }
-        false
+        memo.insert((counts.clone(), after), best);
+        best
     }
 
     fn repeats(order: &[i64], artist_of: &HashMap<i64, &str>, after: Option<&str>) -> usize {
@@ -1105,13 +1122,16 @@ mod tests {
     }
 
     #[test]
-    fn spread_never_repeats_an_artist_when_some_order_avoids_it() {
+    fn spread_has_the_fewest_repeats_possible() {
         // Exhaustive over every song count 0–4 for each of 4 artists (625
         // multisets), each with no preceding artist and with artist "a"
-        // preceding, and every song order given in sampled order a..d.
+        // preceding, songs given grouped by artist a..d. The spread must
+        // match the brute-force minimum: none whenever some order avoids
+        // repeats.
         const NAMES: [&str; 4] = ["a", "b", "c", "d"];
         let mut rng = StdRng::seed_from_u64(5);
-        let (mut cases, mut arrangeable_cases) = (0, 0);
+        let mut memo = HashMap::new();
+        let (mut cases, mut repeat_free_cases) = (0, 0);
         for code in 0..625usize {
             let counts: Vec<usize> = (0..4).map(|i| code / 5usize.pow(i) % 5).collect();
             let mut songs = Vec::new();
@@ -1130,28 +1150,14 @@ mod tests {
                 sorted.sort();
                 assert_eq!(sorted, (0..songs.len() as i64).collect::<Vec<_>>());
                 let reps = repeats(&order, &artist_of, after.map(|a| NAMES[a]));
-                if arrangeable(&mut counts.clone(), after) {
-                    arrangeable_cases += 1;
-                    assert_eq!(reps, 0, "{counts:?} after {after:?}: {order:?}");
-                }
+                let best = min_repeats(&mut counts.clone(), after, &mut memo);
+                assert_eq!(reps, best, "{counts:?} after {after:?}: {order:?}");
+                repeat_free_cases += usize::from(best == 0);
             }
         }
         assert_eq!(cases, 1250);
         // The other 140 have one artist with too many songs to keep apart.
-        assert_eq!(arrangeable_cases, 1110);
-    }
-
-    #[test]
-    fn spread_keeps_repeats_to_the_minimum_when_unavoidable() {
-        // Five songs by "a" and one by "b": the best order, a b a a a a,
-        // still has 3 repeats.
-        let songs: Vec<(i64, Option<&str>)> = (0..5)
-            .map(|id| (id, Some("a")))
-            .chain([(5, Some("b"))])
-            .collect();
-        let artist_of: HashMap<i64, &str> = songs.iter().map(|&(id, a)| (id, a.unwrap())).collect();
-        let order = spread_artists(&songs, None, &mut StdRng::seed_from_u64(1));
-        assert_eq!(repeats(&order, &artist_of, None), 3, "{order:?}");
+        assert_eq!(repeat_free_cases, 1110);
     }
 
     #[test]
