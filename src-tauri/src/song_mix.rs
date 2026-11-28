@@ -262,10 +262,6 @@ const LOVED_OR_FIVE_STAR_MULTIPLIER: f64 = 2.0;
 const FOUR_STAR_MULTIPLIER: f64 = 1.5;
 const FAVOURITE_ARTIST_MULTIPLIER: f64 = 1.5;
 
-fn is_highly_rated_or_loved(c: &Candidate) -> bool {
-    c.loved == 1 || c.rating >= 4.0
-}
-
 fn song_multipliers(c: &Candidate, loved_artists: &HashSet<&str>, now: i64) -> f64 {
     let recency = match c.lastplayed {
         Some(p) if p >= now - RECENT_DAY_SECS => RECENT_DAY_MULTIPLIER,
@@ -343,7 +339,7 @@ pub fn pick(
     let loved_artists: HashSet<&str> = pool
         .candidates
         .iter()
-        .filter(|c| c.loved != -1 && is_highly_rated_or_loved(c))
+        .filter(|c| c.loved != -1 && (c.loved == 1 || c.rating >= 4.0))
         .filter_map(|c| c.artist_key.as_deref())
         .collect();
     let mut per_artist: HashMap<&str, usize> = HashMap::new();
@@ -1269,8 +1265,7 @@ mod tests {
                 _ => {}
             }
         }
-        // X has 2 songs in Match? No, fav_hit is Jazz (Unmatched), so X has 1
-        // Match song (weight 1.5) vs Y's 1 Match song (weight 1.0).
+        // fav_hit is Jazz (Unmatched), so X and Y each have one Match song.
         let ratio = x_picks as f64 / y_picks.max(1) as f64;
         assert!(
             (1.25..1.75).contains(&ratio),
