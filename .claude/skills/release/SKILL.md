@@ -20,7 +20,7 @@ needs updating to match. Work through it in order:
    `bug`-labeled issue — file one retroactively (and link the PR) if it's missing. Chore PRs
    do not require an issue and do not need to be listed in the release notes. A commit title often
    shows only the PR number: read `Fixes #N` in the PR body before concluding a fix has no issue.
-   The release-notes source is the milestone (`gh issue list --milestone X.Y --state all --limit 300`).
+   The release-notes source is the milestone (`gh issue list --milestone X.Y.Z --state all --limit 300`).
    Also check that third-party integrations (Last.fm, MusicBrainz, Files.fm) still work with the
    shipped keys.
 3. **Content**: update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for

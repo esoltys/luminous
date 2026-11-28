@@ -21,7 +21,7 @@ for the release notes and perf runs. Re-run it if the release slips into a new U
       title often shows only the PR number, so read `Fixes #N` in the PR body
       (`gh pr view N --json body`) before concluding a fix has no issue.
 - [ ] The release-notes source is the milestone, not the log:
-      `gh issue list --milestone X.Y --state all --limit 300 --json number,title,labels`.
+      `gh issue list --milestone X.Y.Z --state all --limit 300 --json number,title,labels`.
       Treat a PR carrying the milestone as a mistake (milestones are for issues only).
 - [ ] Check that third-party integrations (Last.fm, MusicBrainz, Files.fm) still work with
       the keys the build ships. 4.0 found late that Last.fm requires a Pro subscription for
