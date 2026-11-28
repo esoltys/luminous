@@ -569,7 +569,7 @@
     {#if !scrobblerStore.lastfmUsername}
       {#if scrobblerStore.lastfmPendingToken}
         <div
-          class="p-4 rounded-lg bg-brand-surface/60 border border-brand-border/80 space-y-3 pt-2 border-t border-brand-border/60"
+          class="p-4 rounded-lg bg-brand-main/60 border border-brand-border/80 space-y-3 pt-2 border-t border-brand-border/60"
         >
           <div class="flex flex-col gap-1">
             <span class="text-sm font-medium text-brand-text-primary">

@@ -105,7 +105,7 @@
       </h2>
       <div
         data-testid="radio-saved-empty"
-        class="p-6 rounded-xl border border-brand-border/40 bg-brand-surface/40 text-center space-y-2"
+        class="p-6 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 text-center space-y-2"
       >
         <p class="text-sm text-brand-text-secondary">
           {i18n.t("radio.noSavedStations")}
@@ -223,7 +223,7 @@
 
       {#if stationLists.length === 0}
         <div
-          class="p-5 rounded-xl border border-brand-border/40 bg-brand-surface/40 text-center space-y-1.5"
+          class="p-5 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 text-center space-y-1.5"
         >
           <p class="text-sm text-brand-text-secondary">
             {i18n.t("radio.noStationLists")}

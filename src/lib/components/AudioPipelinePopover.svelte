@@ -160,7 +160,7 @@
   >
     <!-- Header -->
     <div
-      class="flex items-center justify-between px-4 py-3 border-b border-brand-border/40 bg-brand-bg/50 shrink-0"
+      class="flex items-center justify-between px-4 py-3 border-b border-brand-border/40 bg-brand-main/50 shrink-0"
     >
       <div class="flex items-center gap-2">
         <Activity class="w-4 h-4 text-brand-text-primary" />

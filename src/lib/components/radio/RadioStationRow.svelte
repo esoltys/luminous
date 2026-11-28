@@ -60,7 +60,7 @@
     e.stopPropagation();
     menu = { x: e.clientX, y: e.clientY };
   }}
-  class="@container flex items-center gap-3 px-3 py-2.5 rounded-xl border border-brand-border/40 bg-brand-surface/40 hover:bg-brand-surface/80 transition-colors duration-150"
+  class="@container flex items-center gap-3 px-3 py-2.5 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 hover:bg-brand-sidebar/80 transition-colors duration-150"
 >
   <button
     type="button"
@@ -73,7 +73,7 @@
       ? playing
         ? 'bg-brand-accent text-brand-accent-contrast'
         : 'bg-brand-accent/15 text-brand-accent-text hover:bg-brand-accent hover:text-brand-accent-contrast'
-      : 'bg-brand-surface text-brand-text-secondary opacity-60 cursor-not-allowed'}"
+      : 'bg-brand-main text-brand-text-secondary opacity-60 cursor-not-allowed'}"
   >
     {#if artworkUrl && !artFailed}
       <img
@@ -177,7 +177,7 @@
       title={pinLabel}
       class="inline-flex items-center justify-center p-1.5 rounded-lg transition-colors duration-150 {pinned
         ? 'text-brand-accent-text hover:opacity-80'
-        : 'text-brand-text-secondary hover:bg-brand-surface hover:text-brand-text-primary'}"
+        : 'text-brand-text-secondary hover:bg-brand-text-primary/10 hover:text-brand-text-primary'}"
     >
       <Pin class="w-4 h-4" weight={pinned ? "fill" : "regular"} />
     </button>
@@ -188,7 +188,7 @@
       aria-label={saved ? i18n.t("radio.unsaveStation") : i18n.t("radio.saveStation")}
       class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 {saved
         ? 'bg-brand-accent/20 text-brand-accent-text hover:bg-brand-accent/30'
-        : 'text-brand-text-secondary hover:bg-brand-surface hover:text-brand-text-primary'}"
+        : 'text-brand-text-secondary hover:bg-brand-text-primary/10 hover:text-brand-text-primary'}"
     >
       <Bookmark class="w-4 h-4 shrink-0" weight={saved ? "fill" : "regular"} />
       <span class="hidden @md:inline-grid items-center text-left">

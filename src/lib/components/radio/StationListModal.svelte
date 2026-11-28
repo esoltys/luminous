@@ -134,7 +134,7 @@
         type="button"
         onclick={onClose}
         aria-label={i18n.t("common.close")}
-        class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-surface-hover"
+        class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main"
       >
         <X class="w-4 h-4" />
       </button>
@@ -173,7 +173,7 @@
                 onclick={() => toggleTag(genre.name)}
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors {active
                   ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
-                  : 'bg-brand-bg/60 text-brand-text-primary border-brand-border/60 hover:bg-brand-surface-hover'}"
+                  : 'bg-brand-main/60 text-brand-text-primary border-brand-border/60 hover:bg-brand-main'}"
               >
                 <span>{genre.name}</span>
                 <span class="opacity-70 text-[10px]">{genre.stationcount}</span>
@@ -223,7 +223,7 @@
         />
 
         <div
-          class="max-h-40 overflow-y-auto rounded-xl border border-brand-border/50 bg-brand-bg/40 p-2 flex flex-wrap gap-1.5"
+          class="max-h-40 overflow-y-auto rounded-xl border border-brand-border/50 bg-brand-main/40 p-2 flex flex-wrap gap-1.5"
           data-testid="station-list-tag-picker"
         >
           {#if radioStore.stationListTagsLoading}
@@ -238,7 +238,7 @@
                 onclick={() => toggleTag(tag.name)}
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition-colors {active
                   ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
-                  : 'bg-brand-surface/70 text-brand-text-primary border-brand-border/40 hover:bg-brand-surface-hover'}"
+                  : 'bg-brand-main/70 text-brand-text-primary border-brand-border/40 hover:bg-brand-main'}"
               >
                 {#if active}<Check class="w-3 h-3" />{/if}
                 <span>{tag.name}</span>

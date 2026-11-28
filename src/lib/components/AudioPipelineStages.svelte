@@ -106,7 +106,7 @@
       </div>
 
       <div
-        class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
+        class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-main p-2.5 rounded-lg border border-brand-border/30"
       >
         <div class="flex flex-col">
           <span class="label-small text-brand-text-secondary">
@@ -193,7 +193,7 @@
       </div>
 
       <div
-        class="grid grid-cols-1 gap-2 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
+        class="grid grid-cols-1 gap-2 text-xs bg-brand-main p-2.5 rounded-lg border border-brand-border/30"
       >
         <!-- Equalizer -->
         <div class="flex items-center justify-between gap-2">
@@ -286,7 +286,7 @@
       </div>
 
       <div
-        class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
+        class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-main p-2.5 rounded-lg border border-brand-border/30"
       >
         <div class="col-span-2 flex flex-col">
           <span class="label-small text-brand-text-secondary">

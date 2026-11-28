@@ -1135,7 +1135,7 @@
                     {i18n.t("tagEditor.historySourceHeading")}
                   </div>
                   <div
-                    class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs bg-brand-surface/50 p-2.5 rounded border border-brand-border/40"
+                    class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs bg-brand-main/50 p-2.5 rounded border border-brand-border/40"
                   >
                     <div>
                       <span class="text-brand-text-secondary">
@@ -1194,14 +1194,14 @@
                           label={i18n.t("tagEditor.historyTimestampHint")}
                         />
                         <div
-                          class="flex items-center gap-1 bg-brand-surface/60 p-0.5 rounded border border-brand-border/40 text-[11px]"
+                          class="flex items-center gap-1 bg-brand-main/60 p-0.5 rounded border border-brand-border/40 text-[11px]"
                           role="radiogroup"
                           aria-label={i18n.t("tagEditor.historyFilterLabel")}
                         >
                           <button
                             type="button"
                             class="px-2 py-0.5 rounded transition-colors {historyFilter === 'all'
-                              ? 'bg-brand-primary text-white font-medium'
+                              ? 'bg-brand-accent text-brand-accent-contrast font-medium'
                               : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                             onclick={() => {
                               historyFilter = "all";
@@ -1214,7 +1214,7 @@
                           <button
                             type="button"
                             class="px-2 py-0.5 rounded transition-colors {historyFilter === 'scan'
-                              ? 'bg-brand-primary text-white font-medium'
+                              ? 'bg-brand-accent text-brand-accent-contrast font-medium'
                               : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                             onclick={() => {
                               historyFilter = "scan";
@@ -1243,7 +1243,7 @@
                       <div class="space-y-2">
                         {#each displayedEntries as entry (entry.id)}
                           <div
-                            class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1.5"
+                            class="p-2 rounded bg-brand-main/40 border border-brand-border/40 text-xs flex flex-col gap-1.5"
                           >
                             <div
                               class="flex items-center justify-between text-brand-text-secondary text-[11px]"

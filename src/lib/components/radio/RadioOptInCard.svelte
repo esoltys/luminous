@@ -23,7 +23,7 @@
 
 <div
   data-testid="radio-opt-in-card"
-  class="max-w-xl mx-auto my-8 p-6 rounded-2xl border border-brand-border/60 bg-brand-surface/60 text-center space-y-4"
+  class="max-w-xl mx-auto my-8 p-6 rounded-2xl border border-brand-border/60 bg-brand-sidebar/60 text-center space-y-4"
 >
   <div
     class="w-12 h-12 mx-auto rounded-2xl bg-brand-accent/15 text-brand-accent-text flex items-center justify-center"
@@ -44,7 +44,7 @@
     <div
       data-testid="radio-sync-error"
       role="alert"
-      class="flex items-start gap-2.5 text-left p-3 rounded-xl border border-brand-border bg-brand-surface text-sm text-brand-text-primary"
+      class="flex items-start gap-2.5 text-left p-3 rounded-xl border border-brand-border bg-brand-main text-sm text-brand-text-primary"
     >
       <AlertCircle class="w-4 h-4 mt-0.5 shrink-0 text-brand-text-secondary" />
       <div class="flex-1 min-w-0">
@@ -57,7 +57,7 @@
   {#if syncing}
     <div
       data-testid="radio-sync-progress"
-      class="p-3 rounded-xl bg-brand-surface/80 border border-brand-border/40 text-sm text-brand-text-secondary space-y-1.5"
+      class="p-3 rounded-xl bg-brand-main/80 border border-brand-border/40 text-sm text-brand-text-secondary space-y-1.5"
     >
       <div class="flex items-center justify-center gap-2 font-medium text-brand-text-primary">
         <RefreshCw class="w-4 h-4 animate-spin" />

@@ -310,7 +310,7 @@
         {/if}
       </div>
 
-      <div class="flex gap-1 p-1 rounded-lg bg-brand-bg/40 text-xs font-semibold">
+      <div class="flex gap-1 p-1 rounded-lg bg-brand-main/40 text-xs font-semibold">
         <button
           type="button"
           onclick={() => setActiveTab("context")}
