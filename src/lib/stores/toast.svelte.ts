@@ -43,6 +43,44 @@ const NOTIFICATION_PREFERENCES: readonly NotificationPreference[] = [
 ];
 
 const PREFERENCES_SETTING_KEY = "notification_preferences";
+const BATCH_WAITS_SETTING_KEY = "notification_batch_waits";
+
+/**
+ * Types whose notifications the user can ask to see less often. Confirmations answer a
+ * click, tasks show live progress and celebrations are rare, so none of those wait.
+ */
+export const BATCHABLE_TYPES: readonly NotificationType[] = ["library", "devices", "playback"];
+
+/** Seconds a batchable type waits to group its notifications; 0 is "right away". */
+export const BATCH_WAIT_OPTIONS_S = [0, 10, 60, 300] as const;
+export type BatchWaitSeconds = (typeof BATCH_WAIT_OPTIONS_S)[number];
+
+/** How far past its wait a still-busy source's batch may be held before it shows anyway. */
+const MAX_SETTLE_OVERRUN_MS = 30_000;
+
+/**
+ * One kind of summarised notification, e.g. "N files moved". Reports of the same kind
+ * (same type, `summaryKey` and `vars`) are added up and shown as one toast.
+ */
+interface ReportKind {
+  /** Plural i18n key; it receives the summed `count`. */
+  summaryKey: string;
+  vars?: Record<string, string | number>;
+  variant?: ToastVariant;
+  durationMs?: number;
+  /** Quiet time the source needs before its burst is complete; the floor even at "right away". */
+  settleMs?: number;
+}
+
+interface PendingReport {
+  key: string;
+  type: NotificationType;
+  kind: ReportKind;
+  total: number;
+  firstAt: number;
+  lastAt: number;
+  timer?: ReturnType<typeof setTimeout>;
+}
 
 // Spelled out, not built from the type, so the keys stay greppable.
 const TYPE_TEXT_KEYS: Record<NotificationType, { label: string; hint: string }> = {
@@ -103,6 +141,10 @@ interface ToastMessage {
   requestedDurationMs?: number;
   /** Store-owned notices (e.g. "turned off, Undo") that preferences never apply to. */
   isSystemNotice?: boolean;
+  /** How many earlier toasts of this type were folded into this one ("+N more"). */
+  moreCount?: number;
+  /** Until when (epoch ms) later plain toasts of the type fold into this one. */
+  mergeableUntil?: number;
 }
 
 /** The subset of the store a notification source needs, with its type bound. */
@@ -124,20 +166,125 @@ interface ToastChannel {
   startBatch(text: string, variant?: ToastVariant): number;
   /** Collapse a batch toast into its completion message, which then auto-dismisses. */
   finishBatch(id: number, text: string, variant?: ToastVariant, durationMs?: number): void;
+  /**
+   * Report `count` occurrences of `kind`. Reports are held for the type's batching wait
+   * (and the kind's `settleMs`), then shown as one summed toast. Never use it for errors.
+   */
+  report(kind: ReportKind, count?: number): void;
 }
 
 class ToastStore {
   messages = $state<ToastMessage[]>([]);
   /** Per-type preferences; a type missing here is `default`. */
   preferences = $state<Partial<Record<NotificationType, NotificationPreference>>>({});
+  /** Per-type batching waits in seconds; a type missing here is 0 ("right away"). */
+  batchWaits = $state<Partial<Record<NotificationType, BatchWaitSeconds>>>({});
   private nextId = 0;
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
+  private pendingReports = new Map<string, PendingReport>();
+
+  batchWaitFor(type: NotificationType): BatchWaitSeconds {
+    return BATCHABLE_TYPES.includes(type) ? (this.batchWaits[type] ?? 0) : 0;
+  }
+
+  /** Set how long `type` waits to group notifications, reschedule what it holds, and save it. */
+  setBatchWait(type: NotificationType, seconds: BatchWaitSeconds) {
+    this.batchWaits = { ...this.batchWaits, [type]: seconds };
+    for (const pending of this.pendingReports.values()) {
+      if (pending.type === type) this.schedule(pending);
+    }
+    invoke("set_app_setting", {
+      key: BATCH_WAITS_SETTING_KEY,
+      value: JSON.stringify(this.batchWaits),
+    }).catch((err) => console.error("Failed to save notification batch waits:", err));
+  }
+
+  private report(type: NotificationType, kind: ReportKind, count: number) {
+    if (count <= 0) return;
+    const key = `${type}\u0000${kind.summaryKey}\u0000${JSON.stringify(kind.vars ?? {})}`;
+    const now = Date.now();
+    const pending = this.pendingReports.get(key);
+    if (pending) {
+      pending.total += count;
+      pending.lastAt = now;
+      this.schedule(pending);
+      return;
+    }
+    const fresh: PendingReport = { key, type, kind, total: count, firstAt: now, lastAt: now };
+    this.pendingReports.set(key, fresh);
+    this.schedule(fresh);
+  }
+
+  /** Show `pending` once its wait has passed and its source has settled (capped), or now if both are 0. */
+  private schedule(pending: PendingReport) {
+    if (pending.timer) clearTimeout(pending.timer);
+    const waitMs = this.batchWaitFor(pending.type) * 1000;
+    const due = Math.min(
+      Math.max(pending.firstAt + waitMs, pending.lastAt + (pending.kind.settleMs ?? 0)),
+      pending.firstAt + waitMs + MAX_SETTLE_OVERRUN_MS,
+    );
+    const delay = due - Date.now();
+    if (delay <= 0) this.flush(pending);
+    else pending.timer = setTimeout(() => this.flush(pending), delay);
+  }
+
+  private flush(pending: PendingReport) {
+    if (pending.timer) clearTimeout(pending.timer);
+    this.pendingReports.delete(pending.key);
+    const { summaryKey, vars, variant = "success", durationMs } = pending.kind;
+    this.add(
+      pending.type,
+      { text: i18n.plural(summaryKey, pending.total, vars ?? {}), variant },
+      durationMs,
+    );
+  }
+
+  /** Whether a plain toast like this may fold into, or absorb, others of its type. */
+  private mergeWindow(
+    type: NotificationType,
+    variant: ToastVariant,
+    url?: string,
+    action?: ToastAction,
+  ): { mergeableUntil?: number } {
+    const waitMs = this.batchWaitFor(type) * 1000;
+    if (waitMs === 0 || url || action || variant === "error" || variant === "warning") return {};
+    return { mergeableUntil: Date.now() + waitMs };
+  }
+
+  /** Fold a plain toast into the newest open one of its type ("+N more"); returns its id, or null. */
+  private mergeInto(
+    type: NotificationType,
+    text: string,
+    variant: ToastVariant,
+    durationMs?: number,
+    url?: string,
+    action?: ToastAction,
+  ): number | null {
+    if (!this.mergeWindow(type, variant, url, action).mergeableUntil) return null;
+    const now = Date.now();
+    const target = this.messages.findLast(
+      (m) => m.type === type && m.mergeableUntil !== undefined && m.mergeableUntil > now,
+    );
+    if (!target) return null;
+    target.text = text;
+    target.variant = variant;
+    target.moreCount = (target.moreCount ?? 0) + 1;
+    target.requestedDurationMs = durationMs;
+    this.applyPolicy(target);
+    return target.id;
+  }
 
   /** A handle that raises notifications of `type`; see `NotificationType`. */
   channel(type: NotificationType): ToastChannel {
     return {
       show: (text, variant = "info", durationMs, url, action) =>
-        this.add(type, { text, variant, url, action }, durationMs),
+        this.mergeInto(type, text, variant, durationMs, url, action) ??
+        this.add(
+          type,
+          { text, variant, url, action, ...this.mergeWindow(type, variant, url, action) },
+          durationMs,
+        ),
+      report: (kind, count = 1) => this.report(type, kind, count),
       startBatch: (text, variant = "info") => this.add(type, { text, variant }),
       finishBatch: (id, text, variant = "success", durationMs = TOAST_DURATION_MS) => {
         const msg = this.messages.find((m) => m.id === id);
@@ -214,6 +361,11 @@ class ToastStore {
         ...parsePreferences(settings?.[PREFERENCES_SETTING_KEY]),
         ...this.preferences,
       };
+      this.batchWaits = {
+        ...parseBatchWaits(settings?.[BATCH_WAITS_SETTING_KEY]),
+        ...this.batchWaits,
+      };
+      for (const pending of this.pendingReports.values()) this.schedule(pending);
       this.applyPreferences();
     } catch (err) {
       console.error("Failed to load notification preferences:", err);
@@ -507,6 +659,30 @@ function parsePreferences(
       NOTIFICATION_PREFERENCES.includes(preference as NotificationPreference)
     ) {
       result[type as NotificationType] = preference as NotificationPreference;
+    }
+  }
+  return result;
+}
+
+/** Read the saved batching waits, dropping unbatchable types and unknown values. */
+function parseBatchWaits(
+  raw: string | undefined,
+): Partial<Record<NotificationType, BatchWaitSeconds>> {
+  if (!raw) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== "object") return {};
+  const result: Partial<Record<NotificationType, BatchWaitSeconds>> = {};
+  for (const [type, seconds] of Object.entries(parsed)) {
+    if (
+      BATCHABLE_TYPES.includes(type as NotificationType) &&
+      BATCH_WAIT_OPTIONS_S.includes(seconds as BatchWaitSeconds)
+    ) {
+      result[type as NotificationType] = seconds as BatchWaitSeconds;
     }
   }
   return result;
